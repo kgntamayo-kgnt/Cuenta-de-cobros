@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clasificador de Informes y Evidencias GAN - MME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    /* Estricta contención de gráficos para evitar desbordes visuales */
+    svg {
+      display: inline-block;
+      vertical-align: middle;
+      max-width: 20px !important;
+      max-height: 20px !important;
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased">
+
+  <header class="bg-slate-900 text-white shadow-md border-b border-sky-900/40 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 font-bold shrink-0 text-xl shadow-inner">
+          ⚛️
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            Clasificador de Evidencias Mensuales GAN
+            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">MME • SECOP II</span>
+          </h1>
+          <p class="text-xs text-sky-200/80">Karel Giovanny Nuñez Tamayo | Contrato GGC-0073-2026</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnProcessAll" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer">
+          <span>⚡</span>
+          <span>Clasificar Todo</span>
+        </button>
+        <button id="btnCopyEntireTable" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer">
+          <span>📋</span>
+          <span>Copiar Todo el Informe</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 flex flex-col gap-6">
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Documentos</p>
+          <p id="statTotalItems" class="text-2xl font-bold text-slate-800">0</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">📄</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Clasificados (100%)</p>
+          <p id="statAssignedItems" class="text-2xl font-bold text-emerald-600">0</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">✓</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Obligación 2 (Instalaciones)</p>
+          <p id="statOb2Items" class="text-2xl font-bold text-sky-600">0</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center font-bold text-lg">🏭</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Carpetas / Grupos</p>
+          <p id="statFolders" class="text-2xl font-bold text-purple-600">0</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-lg">📁</div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <span>📥</span> Listado de Producciones Mensuales a Clasificar
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Pega aquí los nombres de archivos o usa la muestra de Septiembre 2026.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnReloadSample" class="text-xs text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium cursor-pointer">
+            Recargar Septiembre 2026
+          </button>
+          <button id="toggleInputPanel" class="text-xs text-sky-700 hover:text-sky-900 font-semibold px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 transition-colors cursor-pointer">
+            Mostrar / Ocultar Caja
+          </button>
+        </div>
+      </div>
+
+      <div id="inputPanelsWrapper" class="p-4 flex flex-col gap-3">
+        <textarea id="txtCurrentMonth" rows="8" class="w-full text-xs font-mono p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none custom-scrollbar" placeholder="Pega aquí el listado de archivos y carpetas del mes..."></textarea>
+        
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+          <span class="text-slate-500">El 100% de los archivos se asignan de acuerdo a las 7 obligaciones contractuales.</span>
+          <button id="btnClearInput" class="text-xs text-rose-600 hover:text-rose-800 underline font-medium cursor-pointer">
+            Limpiar texto
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert / Toast notification banner -->
+    <div id="alertBox" class="hidden rounded-lg p-3 text-xs flex items-center justify-between shadow-sm transition-all duration-200">
+      <span id="alertMessage" class="font-medium"></span>
+      <button onclick="document.getElementById('alertBox').classList.add('hidden')" class="text-sm font-bold opacity-70 hover:opacity-100 px-2 cursor-pointer">&times;</button>
+    </div>
+
+    <!-- Tabs and Search Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-xs font-semibold">
+        <button id="tabCardsView" class="px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer">Vista por Obligación (7)</button>
+        <button id="tabTableView" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer">Tabla Formato Word</button>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-slate-500 font-medium">Buscar en resultados:</span>
+        <input type="text" id="quickSearch" placeholder="Buscar radicado o palabra..." class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none w-56 sm:w-64">
+      </div>
+    </div>
+
+    <!-- Cards View -->
+    <div id="cardsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <!-- Injected dynamically by JS -->
+    </div>
+
+    <!-- Word Table Format View -->
+    <div id="tableOutputContainer" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+      <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-slate-800">Previsualización de la Tabla para Word (Informe Mensual)</h3>
+          <p class="text-xs text-slate-500">Copia y pega directamente en la plantilla .docx en la columna de avances y logros.</p>
+        </div>
+        <button id="btnDownloadWordSnippet" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 font-semibold transition-colors cursor-pointer">
+          <span>📋</span> Copiar Todo al Portapapeles
+        </button>
+      </div>
+
+      <div class="overflow-x-auto border border-slate-200 rounded-lg">
+        <table class="w-full text-xs text-left border-collapse" id="wordFormattedTable">
+          <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+            <tr>
+              <th class="p-3 w-12 text-center border-r border-slate-200">No.</th>
+              <th class="p-3 w-2/5 border-r border-slate-200">OBLIGACIONES Y/O ACTIVIDADES</th>
+              <th class="p-3">AVANCES Y LOGROS DEL MES (Documentos de soporte)</th>
+            </tr>
+          </thead>
+          <tbody id="wordTableBody" class="divide-y divide-slate-200">
+            <!-- Dynamic rows populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Reassignment Modal -->
+  <div id="moveModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+        <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+          <span>✏️</span> Cambiar de Obligación
+        </h4>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold leading-none cursor-pointer">&times;</button>
+      </div>
+      <div>
+        <p class="text-xs text-slate-500 mb-1">Documento seleccionado:</p>
+        <p id="modalDocName" class="text-xs font-mono font-semibold text-slate-800 bg-slate-100 p-2.5 rounded-lg break-all"></p>
+      </div>
+      <div>
+        <label for="modalSelectObligation" class="text-xs font-semibold text-slate-700 block mb-1">Reasignar a la obligación:</label>
+        <select id="modalSelectObligation" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 bg-white">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-100 font-medium cursor-pointer">Cancelar</button>
+        <button id="modalBtnConfirm" class="px-4 py-1.5 rounded-lg text-xs bg-sky-600 hover:bg-sky-500 text-white font-semibold cursor-pointer">Guardar Cambio</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 mt-auto">
+    Asistente Técnico Contractual GAN • MME / SECOP II
+  </footer>
+
+  <script>
+    const OBLIGACIONES = [
+      {
+        id: 1,
+        titulo: "Obligación 1 - Acuerdos e Hitos Nucleares / Política Pública",
+        descripcion: "Impulsar los acuerdos interinstitucionales que fortalezcan las aplicaciones o tecnologías nucleares de acuerdo con la regulación o normativa aplicable, para él 'Fortalecimiento de la política pública para mejorar el acceso a tecnologías o aplicaciones nucleares avanzadas en el territorio nacional'."
+      },
+      {
+        id: 2,
+        titulo: "Obligación 2 - Apoyo Técnico en Instalaciones, Licencias e Inspecciones",
+        descripcion: "Brindar apoyo técnico en las evaluaciones e inspecciones de las instalaciones con tecnologías nucleares, cumpliendo los estándares del OIEA."
+      },
+      {
+        id: 3,
+        titulo: "Obligación 3 - Seguimiento a Contratos, Convenios y TdRs",
+        descripcion: "Apoyar al supervisor de los contratos o convenios del GAN en el seguimiento técnico, financiero y administrativo."
+      },
+      {
+        id: 4,
+        titulo: "Obligación 4 - Informes Técnicos de Mitigación de Riesgos y Fuentes",
+        descripcion: "Coadyuvar a gestionar y elaborar informes técnicos para la mitigación de riesgos, formulando recomendaciones basadas en los hallazgos de las inspecciones."
+      },
+      {
+        id: 5,
+        titulo: "Obligación 5 - Articulación de Mesas Técnicas, Cooperación y NORM",
+        descripcion: "Apoyar en la articulación de las mesas técnicas de trabajo, comités, mesas de seguimiento interinstitucional, eventos de cooperación con entidades u organismos internacionales, así como nacionales, empresas, agentes y cualquier actor."
+      },
+      {
+        id: 6,
+        titulo: "Obligación 6 - Elaboración y Revisión de Actas y Respuestas Legislativas",
+        descripcion: "Coadyuvar en la elaboración y revisión de las actas y demás documentos que se generen dentro de las reuniones que se realicen en el marco de las obligaciones contractuales."
+      },
+      {
+        id: 7,
+        titulo: "Obligación 7 - Demás Actividades Inherentes / Normativa / Administrativas",
+        descripcion: "Todas las demás inherentes o necesarias para la correcta ejecución del objeto contractual y su alcance, que le sean asignadas por el o la supervisor (a)."
+      }
+    ];
+
+    const SAMPLE_SEPTEMBER = `CARPETA: 1-2026-037169 fuente GDR
+1202640050371691_00005.pdf
+1202640050371691_00006.pdf
+1202640050371691_00007.pdf
+202640050371691_00001.pdf
+202640050371691_00002.pdf
+202640050371691_00003.png
+202640050371691_00004.pdf
+1-2026-040531-Disponibilida personal.pdf
+1-2026-040542-fuente Sr--Am.pdf
+CARPETA: 1-2026-041551-Instructivo de acceso
+1202640050415511_00001.pdf
+1202640050415511_00002.pdf
+1202640050415511_00003.pdf
+1202640050415511_00004.pdf
+1-2026-041551-Instructivo de acceso.zip
+1202640050405311_00001 (1).pdf
+1202640050418681_00001.pdf
+2-2026-041310.pdf
+2-2026-041595.pdf
+2-2026-041600.pdf
+2.1 Responsibilities and Functions of NEPIO.pptx
+20260914_Ana_Erazo_Compromisos_Materia_Nuclear.docx
+20260919 - Rta DP GOBERNANZA RESILIENTE 1-2026-044323.docx
+3-2026-042790.pdf
+3.7 Management of a Nuclear Power Programme.pptx
+5.0 Management of a Nuclear Power Programme rev (1).pptx
+5.0 Management of a Nuclear Power Programme rev1.pptx
+8833896c-1304-498e-b588-65190627c2ca.jpg
+Acta Posesión No. 83 AMAT ZULUAGA.pdf
+Anexos (10).zip
+Aportes GAN al PND después de sep 2026.docx
+CARPETA: Argentina
+ARN_2025_10-16-1_r04-Transporte-Material-Radiactivo.pdf
+CNEN_2014_Directiva-09-Muestreo-pila-fosfoyeso.pdf
+CNEN_2021_Resolución-288-Limpieza-Tubería-NORM.pdf
+Argentina.zip
+borrador instructivo Ingreso.docx
+borrador r626--proroga.docx
+borrador r763 personal y director.docx
+borrador respuesta fuente sr y am.docx
+borrador respuesta ra226.docx
+CARPETA: Brasil
+ANSN_Norma-3-01-2025_Requisitos-Radioprotección-Seg-Radiológica-Fuentes.pdf
+ANSN_Norma-4-01-2016_Requisitos-Seg-Radiológica-Instalaciones-Mineras.pdf
+ANSN_Resolución14-2026_Requisitos-Instalaciones-NORM-OyG.pdf
+CNEN_Guía-Reg-Resolución179-2014_Uso-Fosfoyeso-Agricultura-Indus-Cementera.pdf
+CNEN_Resolución179-2014_Uso-Fosfoyeso-Agricultura-Indus-Cementera.pdf
+Brasil.zip
+Bullets NORM.docx
+c916eaf1-3db5-476f-960a-b4b442f5bc32.jpg
+Circular_DIN-20260300000015_GTO_Energía Nuclear_Convocatoria.pdf
+Colombia_NORM_Regulatory_Blueprint.pptx
+Colombia_NORM_Roadmap.pptx
+Colombia_Nuclear_Energy_Evaluation (1).pptx
+Colombia_Nuclear_Energy_Evaluation.pptx
+COrreo calificaciones reactor.docx
+Enfoque_de_hitos__(2).pptx
+CARPETA: España
+CSN_GS-11-03_Metodología-evaluación-impacto-radiológico-industrias-NORM.pdf
+CSN_Real Decreto 1029 de 2022_Protección-salud-riesgos-radiaciones-ionizantes.pdf
+CSN_Real Decreto 1217 de 2024_Instalaciones-Nucleares-Radiactivas-Exposición-RI.pdf
+España.zip
+Estrategia_NORM_Colombia.pptx
+Examen Camilo Calderon - RN IAN R1 (17-09-2026).pdf
+Examen Responsable de Mantenimiento 2026-2.docx
+F-TNU-MRN-067 acceso.xlsx
+fase1_enfoque_hitos_oiea.pptx
+fase1_limites_y_fases_oiea.pptx
+firma-minenergia-2026.docx
+FortiClientInstaller_arm64.exe
+FortiClientOnlineInstaller_7.4.8.2066.M.exe
+GC-M2-F24 FORMATO INFORME MENSUAL DE ACTIVIDADES SERVICIOS PROFESIONALES Y DE APOYO A LA GESTIÓN MINISTERIO DE MINAS Y ENERGÍA.docx
+Global_NORM_Regulatory_Frameworks.pptx
+hoja_de_ruta_norm-v2.pptx
+hoja_de_ruta_norm.pptx
+Hoja_de_Ruta_para_la_Regulación_de_NORM_en_Colombia_(2).pptx
+IAEA_Milestone_1_Strategy.pptx
+ilovepdf_merged (4).pdf
+IN-TNU-MRN-036_protected.pdf
+index.html.html
+Infografia_Ejecutiva_OLACDE_Colombia_MinEnergia.pdf
+Intructivo acceso.docx
+Ley_2603_de_2026_Congreso_de_la_República.pdf
+Manual INSTALACION VPN 1 1_2790_3542_3536.pdf
+Memmorandum of Understanding with DOE.pdf
+Memorando Estratégico y Marco de Necesidades - Nucleoelectricidad.docx
+MISE_CursoAnteConsejoAcademico Avance (1).pptx
+MISE_CursoAnteConsejoAcademico Avance (24 Sept).pptx
+MISE_CursoAnteConsejoAcademico Avance.pptx
+MISE_Ejemplo.pptx
+NORM GENERALIDADES.pptx
+NORM-Paises__(2).pptx
+norm_presentation.pptx
+NORM_Regulatory_Blueprint.pptx
+Nuevo PND-KN.docx
+Palabras Apertura Vice.docx
+Phase_1_Nuclear_Financial_Strategy.pptx
+plant1787938531122 (1).docx
+plant1787938531122.docx
+Plantiila CUenta cobro 2026-agosto-kn (1).pdf
+Plantiila CUenta cobro 2026-agosto-kn.docx
+Plantiila CUenta cobro 2026-agosto-kn.pdf
+Plantiila CUenta cobro 2026-julio-kn.pdf
+Presentacion BID sep18-KN (2).pptx
+Presentacion BID sep18-KN.pptx
+Presentacion BID sep18.pptx
+Presentacion BID sep21-KN.pptx
+Presentacion ENfoquede hitos.pptx
+presentacion norm foro (1).pptx
+presentacion norm foro.pptx
+Presentacion SGC-Sep 17.pptx
+presentacion-cooperacion-mme-bid-oiea.pptx
+Presentación GAN 2026.pptx
+Presentación Institucional NORM - MinEnergía.pptx
+Prioridades MAcro BID.docx
+Pronter tentativo JP.docx
+Propuesta  DIscusion BID.docx
+Propuesta de respuesta HR Verònica.docx
+Propuesta Respuesta al legislativo USA-KN.docx
+Septiembre.zip
+Taxonomía Verde de Colombia.pdf
+CARPETA: TdR-BID
+CARPETA: 01-Fortalecimiento ANSN
+GAN-PropFin01-Regulador_V05.pptx
+GAN-PropuestaFinaciación01_Regulador_V2.pdf
+TDR - Plantilla Genérica Consultor Individual-ANSN.docx
+CARPETA: 02-Nucleoelectricidad
+GAN-PropuestaFinaciación_Nucleoelectricidad_V2.pdf
+TDR - Plantilla Genérica Consultor Individual-Nucleoelctricidad.docx
+TDR - Plantilla Genérica Consultor Individual.docx
+TDR - Plantilla Genérica Firma.docx`;
+
+    let parsedItems = [];
+    let currentEditIndex = -1;
+
+    function classifyDocument(item) {
+      const lower = item.name.toLowerCase();
+
+      // Excepciones Legislativas y Actas (Obligación 6)
+      if (
+        lower.includes("rta dp") ||
+        lower.includes("gobernanza resiliente") ||
+        lower.includes("respuesta hr") ||
+        lower.includes("legislativo") ||
+        lower.includes("ana_erazo") ||
+        lower.includes("acta posesión") ||
+        lower.includes("posesion") ||
+        lower.includes("ley_2603") ||
+        lower.includes("circular_din") ||
+        lower.includes("pronter")
+      ) {
+        return { id: 6, reason: "Actas de reunión y respuestas al legislativo/congreso" };
+      }
+
+      // Regla Prioritaria: 1-2026-, 2-2026-, 3-2026-, radicados y trámites de instalaciones (Obligación 2)
+      if (
+        lower.startsWith("1-2026-") ||
+        lower.startsWith("2-2026-") ||
+        lower.startsWith("3-2026-") ||
+        lower.startsWith("120264") ||
+        lower.startsWith("20264005") ||
+        lower.startsWith("carpeta: 1-2026-") ||
+        lower.startsWith("carpeta: 2-2026-") ||
+        lower.includes("fuente gdr") ||
+        lower.includes("fuente sr") ||
+        lower.includes("fuente sr--am") ||
+        lower.includes("instructivo de acceso") ||
+        lower.includes("instructivo acceso") ||
+        lower.includes("intructivo acceso") ||
+        lower.includes("f-tnu-mrn") ||
+        lower.includes("in-tnu-mrn") ||
+        lower.includes("calderon") ||
+        lower.includes("calificaciones reactor") ||
+        lower.includes("examen responsable de mantenimiento") ||
+        lower.includes("disponibilida personal") ||
+        lower.includes("examen camilo")
+      ) {
+        return { id: 2, reason: "Radicado oficial o trámite de instalaciones (Regla 1-2026 / 2-2026)" };
+      }
+
+      // Obligación 3: Contratos / TdRs / Cooperación BID / Convenios
+      if (
+        lower.includes("tdr") ||
+        lower.includes("propfin") ||
+        lower.includes("propuestafinaciación") ||
+        lower.includes("consultor individual") ||
+        lower.includes("prioridades macro bid") ||
+        lower.includes("propuesta  discusion bid") ||
+        lower.includes("carpeta: tdr-bid") ||
+        lower.includes("carpeta: 01-fortalecimiento ansn") ||
+        lower.includes("carpeta: 02-nucleoelectricidad") ||
+        lower.includes("presentacion bid")
+      ) {
+        return { id: 3, reason: "Seguimiento a contratos, convenios y TdRs (BID / ANSN)" };
+      }
+
+      // Obligación 5: Mesas técnicas, NORM, cooperación internacional y presentaciones
+      if (
+        lower.includes("norm") ||
+        lower.includes("carpeta: argentina") ||
+        lower.includes("carpeta: brasil") ||
+        lower.includes("carpeta: españa") ||
+        lower.includes("argentina") ||
+        lower.includes("brasil") ||
+        lower.includes("españa") ||
+        lower.includes("cnen") ||
+        lower.includes("ansn") ||
+        lower.includes("csn") ||
+        lower.includes("fosfoyeso") ||
+        lower.includes("mise_curso") ||
+        lower.includes("mise_ejemplo") ||
+        lower.includes("presentacion sgc") ||
+        lower.includes("presentacion norm") ||
+        lower.includes("presentación institucional norm") ||
+        lower.includes("cooperacion-mme-bid-oiea")
+      ) {
+        return { id: 5, reason: "Mesas de trabajo técnico, NORM y presentaciones de cooperación" };
+      }
+
+      // Obligación 1: Política pública, Hitos OIEA, NEPIO, Hojas de Ruta
+      if (
+        lower.includes("nepio") ||
+        lower.includes("nuclear power programme") ||
+        lower.includes("enfoque_de_hitos") ||
+        lower.includes("enfoquede hitos") ||
+        lower.includes("fase1_enfoque") ||
+        lower.includes("fase1_limites") ||
+        lower.includes("iaea_milestone") ||
+        lower.includes("memorando estratégico") ||
+        lower.includes("doe") ||
+        lower.includes("taxonomía verde") ||
+        lower.includes("nucleoelectricidad") ||
+        lower.includes("nuclear_financial_strategy") ||
+        lower.includes("nuclear_energy_evaluation") ||
+        lower.includes("olacde")
+      ) {
+        return { id: 1, reason: "Política pública de nucleoelectricidad y metodología de Hitos OIEA" };
+      }
+
+      // Obligación 4: Informes técnicos de mitigación, hallazgos o inspección
+      if (
+        lower.includes("anexos") ||
+        lower.includes("mitigacion") ||
+        lower.includes("riesgos") ||
+        lower.includes("inspección") ||
+        lower.includes("inspeccion") ||
+        lower.includes("8833896c") ||
+        lower.includes("c916eaf1")
+      ) {
+        return { id: 4, reason: "Informes técnicos para la mitigación de riesgos y evidencias gráficas" };
+      }
+
+      // Obligación 7: Resoluciones, PND, Capacitaciones, Documentos administrativos GAN
+      if (
+        lower.includes("borrador r626") ||
+        lower.includes("borrador r763") ||
+        lower.includes("nuevo pnd") ||
+        lower.includes("aportes gan al pnd") ||
+        lower.includes("palabras apertura") ||
+        lower.includes("firma-minenergia") ||
+        lower.includes("gc-m2-f24") ||
+        lower.includes("presentación gan") ||
+        lower.includes("plantiila") ||
+        lower.includes("plantilla") ||
+        lower.includes("plant1") ||
+        lower.includes("septiembre.zip") ||
+        lower.includes("forticlient") ||
+        lower.includes("vpn") ||
+        lower.includes("index.html")
+      ) {
+        return { id: 7, reason: "Normativa general, PND y actividades de soporte inherentes" };
+      }
+
+      return { id: 2, reason: "Asignado a gestión técnica de trámites/instalaciones" };
+    }
+
+    function processAllData() {
+      const currentRaw = document.getElementById("txtCurrentMonth").value;
+      parsedItems = [];
+      const lines = currentRaw.split("\n");
+      let currentFolder = "";
+
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (!line) continue;
+        if (line.startsWith("REPORTE DE PRODUCCIONES") || line.startsWith("1. DESGLOSE") || line.startsWith("2. REUNIONES")) continue;
+        if (line.includes("No se encontró archivo calendar.ics")) continue;
+
+        if (line.toUpperCase().startsWith("CARPETA:")) {
+          currentFolder = line.substring(line.indexOf(":") + 1).trim();
+          const classification = classifyDocument({ name: line });
+          parsedItems.push({
+            name: line,
+            folderContext: currentFolder,
+            isFolder: true,
+            assignedObligationId: classification.id,
+            reason: classification.reason
+          });
+          continue;
+        }
+
+        const classification = classifyDocument({ name: line });
+
+        parsedItems.push({
+          raw: line,
+          name: line,
+          folderContext: currentFolder,
+          isFolder: false,
+          assignedObligationId: classification.id,
+          reason: classification.reason
+        });
+      }
+
+      updateStatistics();
+      renderAllViews();
+      showAlert(`¡Éxito! ${parsedItems.length} producciones clasificadas en las 7 obligaciones.`, "success");
+    }
+
+    function updateStatistics() {
+      const totalCount = parsedItems.length;
+      const foldersCount = parsedItems.filter(p => p.isFolder).length;
+      const ob2Count = parsedItems.filter(p => p.assignedObligationId === 2).length;
+
+      document.getElementById("statTotalItems").textContent = totalCount;
+      document.getElementById("statAssignedItems").textContent = totalCount;
+      document.getElementById("statOb2Items").textContent = ob2Count;
+      document.getElementById("statFolders").textContent = foldersCount;
+    }
+
+    function renderCardsView() {
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = "";
+      const searchQuery = document.getElementById("quickSearch").value.toLowerCase().trim();
+
+      OBLIGACIONES.forEach(ob => {
+        const items = parsedItems.filter(item => {
+          if (item.assignedObligationId !== ob.id) return false;
+          if (searchQuery) {
+            return item.name.toLowerCase().includes(searchQuery);
+          }
+          return true;
+        });
+
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between overflow-hidden hover:border-sky-300 transition-all";
+
+        let headerHtml = `
+          <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-start gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-sky-600 text-white font-bold text-xs flex items-center justify-center shrink-0">${ob.id}</span>
+                <h4 class="text-xs font-bold text-slate-800 leading-tight">${ob.titulo}</h4>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1 line-clamp-2" title="${ob.descripcion}">${ob.descripcion}</p>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <span class="bg-sky-100 text-sky-800 font-bold text-xs px-2 py-0.5 rounded-full">${items.length}</span>
+              <button onclick="copyObligationText(${ob.id})" class="text-slate-500 hover:text-sky-600 p-1.5 rounded hover:bg-slate-200 text-xs font-bold cursor-pointer" title="Copiar bloque para Word">
+                📋
+              </button>
+            </div>
+          </div>
+        `;
+
+        let listHtml = `<div class="p-3 divide-y divide-slate-100 max-h-80 overflow-y-auto custom-scrollbar flex-1">`;
+        if (items.length === 0) {
+          listHtml += `<p class="text-xs text-slate-400 italic py-4 text-center">Sin documentos asignados.</p>`;
+        } else {
+          items.forEach(item => {
+            const indexInGlobal = parsedItems.indexOf(item);
+            if (item.isFolder) {
+              listHtml += `
+                <div class="py-1.5 flex items-center justify-between text-xs font-bold text-purple-900 bg-purple-50 px-2 rounded my-1">
+                  <span class="flex items-center gap-1.5 truncate">📁 ${escapeHtml(item.name)}</span>
+                  <button onclick="openMoveModal(${indexInGlobal})" class="text-[11px] text-purple-700 hover:underline shrink-0 font-medium cursor-pointer">Mover</button>
+                </div>
+              `;
+            } else {
+              listHtml += `
+                <div class="py-1.5 flex items-center justify-between gap-2 text-xs group hover:bg-slate-50 px-1 rounded transition-colors">
+                  <div class="truncate flex items-center gap-1.5 flex-1" title="${escapeHtml(item.name)}&#10;Regla: ${item.reason}">
+                    <span class="text-slate-400">•</span>
+                    <span class="font-mono text-slate-700 truncate">${escapeHtml(item.name)}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                    <button onclick="openMoveModal(${indexInGlobal})" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Cambiar de obligación">
+                      ✏️
+                    </button>
+                  </div>
+                </div>
+              `;
+            }
+          });
+        }
+        listHtml += `</div>`;
+
+        let footerHtml = `
+          <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs">
+            <span class="text-[11px] text-slate-500 font-medium">Formato SECOP II</span>
+            <button onclick="copyObligationText(${ob.id})" class="text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer">
+              Copiar texto para Word →
+            </button>
+          </div>
+        `;
+
+        card.innerHTML = headerHtml + listHtml + footerHtml;
+        container.appendChild(card);
+      });
+    }
+
+    function renderWordTable() {
+      const tbody = document.getElementById("wordTableBody");
+      tbody.innerHTML = "";
+
+      OBLIGACIONES.forEach(ob => {
+        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+
+        const row = document.createElement("tr");
+        row.className = "hover:bg-slate-50 transition-colors";
+
+        let textBlock = "Documentos empleados o desarrollados para esta actividad:\n";
+        items.forEach(it => {
+          textBlock += `${it.name}\n`;
+        });
+
+        row.innerHTML = `
+          <td class="p-3 text-center font-bold text-slate-600 border-r border-slate-200 align-top">${ob.id}</td>
+          <td class="p-3 border-r border-slate-200 align-top">
+            <p class="font-semibold text-slate-800">${ob.descripcion}</p>
+          </td>
+          <td class="p-3 align-top font-mono text-[11px] text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50/50">
+            ${escapeHtml(textBlock)}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderAllViews() {
+      renderCardsView();
+      renderWordTable();
+    }
+
+    function copyObligationText(obId) {
+      const items = parsedItems.filter(item => item.assignedObligationId === obId);
+      let content = "Documentos empleados o desarrollados para esta actividad:\n";
+      items.forEach(it => {
+        content += `${it.name}\n`;
+      });
+
+      copyToClipboard(content, `Texto para la Obligación ${obId} copiado al portapapeles. ¡Listo para pegar en Word!`);
+    }
+
+    function copyEntireReport() {
+      let fullReport = "INFORME DE CUMPLIMIENTO - OBLIGACIONES ESPECÍFICAS (GAN - MME)\n=======================================================\n\n";
+
+      OBLIGACIONES.forEach(ob => {
+        fullReport += `OBLIGACIÓN ${ob.id}:\n${ob.descripcion}\n\n`;
+        fullReport += `AVANCES Y LOGROS DEL MES:\nDocumentos empleados o desarrollados para esta actividad:\n`;
+        
+        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        items.forEach(it => {
+          fullReport += `${it.name}\n`;
+        });
+        fullReport += "\n-------------------------------------------------------\n\n";
+      });
+
+      copyToClipboard(fullReport, "Informe completo copiado al portapapeles con formato Word.");
+    }
+
+    function copyToClipboard(text, successMsg) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        const successful = document.execCommand("copy");
+        if (successful) {
+          showAlert(successMsg, "success");
+        } else {
+          showAlert("No se pudo copiar automáticamente.", "error");
+        }
+      } catch (err) {
+        showAlert("Error al copiar al portapapeles.", "error");
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function showAlert(msg, type = "success") {
+      const box = document.getElementById("alertBox");
+      const text = document.getElementById("alertMessage");
+      box.className = type === "success" 
+        ? "rounded-lg p-3 text-xs flex items-center justify-between shadow-sm bg-emerald-50 text-emerald-900 border border-emerald-200" 
+        : "rounded-lg p-3 text-xs flex items-center justify-between shadow-sm bg-rose-50 text-rose-900 border border-rose-200";
+      text.textContent = msg;
+      box.classList.remove("hidden");
+      setTimeout(() => {
+        box.classList.add("hidden");
+      }, 4500);
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function openMoveModal(index) {
+      currentEditIndex = index;
+      const item = parsedItems[index];
+      document.getElementById("modalDocName").textContent = item.name;
+
+      const select = document.getElementById("modalSelectObligation");
+      select.innerHTML = "";
+      OBLIGACIONES.forEach(ob => {
+        const opt = document.createElement("option");
+        opt.value = ob.id;
+        opt.textContent = `Obligación ${ob.id} - ${ob.titulo.substring(0, 42)}...`;
+        if (ob.id === item.assignedObligationId) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      document.getElementById("moveModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("moveModal").classList.add("hidden");
+      currentEditIndex = -1;
+    }
+
+    document.getElementById("modalBtnConfirm").addEventListener("click", () => {
+      if (currentEditIndex < 0) return;
+      const select = document.getElementById("modalSelectObligation");
+      parsedItems[currentEditIndex].assignedObligationId = parseInt(select.value, 10);
+      parsedItems[currentEditIndex].reason = "Reasignación manual personalizada";
+      closeModal();
+      renderAllViews();
+      showAlert("Documento reasignado correctamente.", "success");
+    });
+
+    document.getElementById("btnProcessAll").addEventListener("click", processAllData);
+    document.getElementById("btnCopyEntireTable").addEventListener("click", copyEntireReport);
+    document.getElementById("btnDownloadWordSnippet").addEventListener("click", copyEntireReport);
+    document.getElementById("quickSearch").addEventListener("input", renderCardsView);
+
+    document.getElementById("btnReloadSample").addEventListener("click", () => {
+      document.getElementById("txtCurrentMonth").value = SAMPLE_SEPTEMBER;
+      processAllData();
+      showAlert("Listado de Septiembre 2026 cargado y clasificado.", "success");
+    });
+
+    document.getElementById("btnClearInput").addEventListener("click", () => {
+      document.getElementById("txtCurrentMonth").value = "";
+      parsedItems = [];
+      updateStatistics();
+      renderAllViews();
+      showAlert("Área de texto limpiada. Puedes pegar un nuevo listado mensual.", "success");
+    });
+
+    document.getElementById("toggleInputPanel").addEventListener("click", () => {
+      const panel = document.getElementById("inputPanelsWrapper");
+      panel.classList.toggle("hidden");
+    });
+
+    const tabCards = document.getElementById("tabCardsView");
+    const tabTable = document.getElementById("tabTableView");
+    const viewCards = document.getElementById("cardsContainer");
+    const viewTable = document.getElementById("tableOutputContainer");
+
+    function resetTabs() {
+      tabCards.className = "px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all font-semibold cursor-pointer";
+      tabTable.className = "px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all font-semibold cursor-pointer";
+      viewCards.classList.add("hidden");
+      viewTable.classList.add("hidden");
+    }
+
+    tabCards.addEventListener("click", () => {
+      resetTabs();
+      tabCards.className = "px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all font-semibold cursor-pointer";
+      viewCards.classList.remove("hidden");
+    });
+
+    tabTable.addEventListener("click", () => {
+      resetTabs();
+      tabTable.className = "px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all font-semibold cursor-pointer";
+      viewTable.classList.remove("hidden");
+    });
+
+    window.onload = function() {
+      document.getElementById("txtCurrentMonth").value = SAMPLE_SEPTEMBER;
+      processAllData();
+    };
+  </script>
+</body>
+</html>
