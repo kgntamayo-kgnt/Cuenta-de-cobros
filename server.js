@@ -315,10 +315,30 @@ function classifyByRules(name, folderContext = '', customRules = []) {
 }
 
 // Balanceador para garantizar que NINGUNA de las 7 obligaciones quede vacía (Cobertura Total)
+// Manteniendo ESTRICTAMENTE la integridad de carpetas (no separa archivos contenidos en una carpeta)
 function balanceObligationsCoverage(items, classifications) {
   if (!Array.isArray(items) || items.length < 7) {
     return classifications;
   }
+
+  // Asegurar primero que todos los archivos contenidos hereden la obligación de su carpeta
+  const folderObligationMap = new Map();
+  items.forEach((it, idx) => {
+    if (it.isFolder) {
+      const fName = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+      folderObligationMap.set(fName, classifications[idx].obligationId);
+    }
+  });
+
+  items.forEach((it, idx) => {
+    if (!it.isFolder && it.folderContext) {
+      const fName = it.folderContext.trim().toLowerCase();
+      if (folderObligationMap.has(fName)) {
+        classifications[idx].obligationId = folderObligationMap.get(fName);
+        classifications[idx].reason = `Documento contenido en carpeta "${it.folderContext}"`;
+      }
+    }
+  });
 
   const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
   classifications.forEach(c => {
@@ -346,9 +366,13 @@ function balanceObligationsCoverage(items, classifications) {
     let bestIndex = -1;
     let bestScore = -1;
 
+    // Solo tomamos documentos individuales (no hijos de carpetas) para no romper carpetas
     for (let i = 0; i < items.length; i++) {
+      if (items[i].folderContext && !items[i].isFolder) {
+        continue; // NO separar archivos dentro de carpetas
+      }
+
       const currentOb = classifications[i].obligationId;
-      // Solo tomamos de obligaciones que tengan más de 1 documento
       if (counts[currentOb] > 1) {
         const lowerName = (items[i].name + ' ' + (items[i].folderContext || '')).toLowerCase();
         const kwList = keywordsByOb[targetOb] || [];
@@ -357,11 +381,9 @@ function balanceObligationsCoverage(items, classifications) {
           if (lowerName.includes(k)) score += 3;
         });
 
-        // Dar prioridad a tomar de obligaciones con exceso de documentos
         if (counts[currentOb] > 5) score += 2;
         else if (counts[currentOb] > 2) score += 1;
 
-        // Si el destino es la 7, solo transferir si tiene afinidad administrativa/general
         if (targetOb === 7 && (lowerName.includes('administrativ') || lowerName.includes('reunion') || lowerName.includes('cuenta') || lowerName.includes('soporte') || lowerName.includes('formato') || lowerName.includes('pnd') || lowerName.includes('vpn'))) {
           score += 4;
         }
@@ -381,6 +403,19 @@ function balanceObligationsCoverage(items, classifications) {
         obligationId: targetOb,
         reason: `Asignado para garantizar cobertura total de la Obligación ${targetOb} (${classifications[bestIndex].reason || 'documento afín'})`
       };
+
+      // Si el elemento movido era una carpeta completa, mover también todos sus hijos
+      if (items[bestIndex].isFolder) {
+        const folderName = (items[bestIndex].folderContext || items[bestIndex].name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+        items.forEach((childIt, childIdx) => {
+          if (!childIt.isFolder && childIt.folderContext && childIt.folderContext.trim().toLowerCase() === folderName) {
+            classifications[childIdx] = {
+              obligationId: targetOb,
+              reason: `Documento contenido en carpeta "${childIt.folderContext}"`
+            };
+          }
+        });
+      }
     }
   });
 
@@ -419,8 +454,9 @@ app.post('/api/classify', async (req, res) => {
 Debes clasificar cada uno de los archivos y carpetas del listado mensual en EXACTAMENTE UNA de las 7 obligaciones contractuales estándar, SIN REPETICIÓN (cada documento aparece solo una vez).
 
 REGLAS DE ORO OBLIGATORIAS:
-1. COBERTURA TOTAL DEL INFORME: NINGUNA de las 7 obligaciones puede quedar con 0 documentos. El informe de supervisión exige que TODAS y cada una de las 7 obligaciones cuente con documentos de soporte. Si una categoría tiene pocas evidencias directas, asigna documentos o producciones afines para que las 7 queden cubiertas.
-2. PRIORIZACIÓN TÉCNICA (OBLIGACIONES 1 A 6 vs OBLIGACIÓN 7):
+1. INTEGRIDAD TOTAL DE CARPETAS: Todos los documentos contenidos dentro de una carpeta (con folderContext o listados bajo una CARPETA) DEBEN clasificarse OBLIGATORIAMENTE en la misma obligación que dicha carpeta. Jamás separes un archivo de su carpeta contenedora.
+2. COBERTURA TOTAL DEL INFORME: NINGUNA de las 7 obligaciones puede quedar con 0 documentos. El informe de supervisión exige que TODAS y cada una de las 7 obligaciones cuente con documentos de soporte distribuidos de la totalidad listada.
+3. PRIORIZACIÓN TÉCNICA (OBLIGACIONES 1 A 6 vs OBLIGACIÓN 7):
    - La Obligación 7 es de carácter residual y estrictamente administrativo o no técnico (reuniones generales administrativas, inducción VPN/FortiClient, formatos del ministerio, cuentas de cobro).
    - DEBES PRIORIZAR ENÉRGICAMENTE el contenido en las Obligaciones 1 a 6 para todo documento técnico, regulatorio, de política, de supervisión contractual o legislativo.
    - NO envíes a la Obligación 7 ningún archivo que tenga contenido técnico correspondiente a las Obligaciones 1, 2, 3, 4, 5 o 6.

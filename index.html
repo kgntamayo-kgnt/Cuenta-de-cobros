@@ -137,7 +137,7 @@
             <p id="statCoverage" class="text-2xl font-bold text-emerald-600">7 / 7</p>
             <span class="text-[11px] font-semibold text-slate-500">obligaciones</span>
           </div>
-          <p class="text-[10px] text-emerald-700 font-medium">✓ 100% con evidencias</p>
+          <p id="statCoverageNote" class="text-[10px] text-emerald-700 font-medium">✓ 100% con evidencias</p>
         </div>
         <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">✓</div>
       </div>
@@ -211,14 +211,20 @@
           <textarea id="txtCurrentMonth" rows="8" class="w-full text-xs font-mono p-3 bg-transparent border-0 rounded-lg focus:ring-0 focus:outline-none custom-scrollbar resize-y" placeholder="Pega aquí los nombres de archivos y carpetas del mes, o arrastra un archivo de texto aquí..."></textarea>
         </div>
         
-        <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 text-xs">
           <div class="flex items-center gap-2 text-slate-500">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>Los radicados <strong>1-202...</strong>, <strong>2-202...</strong> o <strong>3-202...</strong> se asignan automáticamente a la <strong>Obligación 2 (Instalaciones)</strong>.</span>
           </div>
-          <div class="flex items-center gap-3">
-            <button id="btnClearInput" class="text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer">
-              Limpiar texto
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnClearInput" class="text-xs text-rose-600 hover:text-rose-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer">
+              🗑️ Limpiar
+            </button>
+            <button id="btnProcessRulesInline" class="bg-slate-700 hover:bg-slate-800 text-slate-100 font-semibold text-xs px-3.5 py-2 rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" title="Clasificación inmediata usando reglas contractuales">
+              <span>⚙️</span> Clasificar con Reglas GAN
+            </button>
+            <button id="btnClassifyAIInline" class="bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all shadow-md flex items-center gap-1.5 active:scale-95 cursor-pointer">
+              <span>✨</span> Clasificar con IA (Gemini)
             </button>
           </div>
         </div>
@@ -231,21 +237,31 @@
       <button onclick="document.getElementById('alertBox').classList.add('hidden')" class="text-sm font-bold opacity-70 hover:opacity-100 px-2 cursor-pointer">&times;</button>
     </div>
 
-    <!-- Tabs and Search Bar -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-xs font-semibold">
-        <button id="tabCardsView" class="px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer">Vista por Obligación (7)</button>
-        <button id="tabTableView" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer">Tabla Formato Word (Oficial)</button>
+    <!-- Tabs, Search Bar and Obligation Quick Pills -->
+    <div class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-xs font-semibold">
+          <button id="tabCardsView" class="px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer">Vista por Obligación (7 Secciones)</button>
+          <button id="tabTableView" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer">Tabla Formato Word (Oficial)</button>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-500 font-medium">Filtrar por nombre o radicado:</span>
+          <input type="text" id="quickSearch" placeholder="Ej. 1-2026, NORM, BID, acta..." class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none w-56 sm:w-64">
+        </div>
       </div>
 
-      <div class="flex items-center gap-2 text-xs">
-        <span class="text-slate-500 font-medium">Filtrar por nombre o radicado:</span>
-        <input type="text" id="quickSearch" placeholder="Ej. 1-2026, NORM, BID, acta..." class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none w-56 sm:w-64">
+      <!-- 7 Obligations Filter & Quick Jump Pills Bar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs flex flex-wrap items-center gap-1.5 text-xs">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Secciones:</span>
+        <div id="obligationPillsContainer" class="flex flex-wrap items-center gap-1.5">
+          <!-- Populated dynamically: [ Todas (7) ] [ Ob 1: Hitos ] ... [ Ob 7: Administrativas ] -->
+        </div>
       </div>
     </div>
 
     <!-- Cards View (7 Obligations) -->
-    <div id="cardsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+    <div id="cardsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-5 scroll-mt-6">
       <!-- Injected dynamically by JS -->
     </div>
 
@@ -302,6 +318,15 @@
         <select id="modalSelectObligation" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 bg-white">
           <!-- Populated by JS -->
         </select>
+      </div>
+      <div id="modalFolderSyncContainer" class="hidden bg-purple-50 border border-purple-200 rounded-lg p-3">
+        <label class="flex items-start gap-2.5 cursor-pointer">
+          <input type="checkbox" id="modalSyncFolderCheckbox" checked class="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4">
+          <div class="text-xs text-purple-950 leading-snug">
+            <span class="font-bold flex items-center gap-1"><span>📁</span> Sincronizar todos los documentos de la carpeta</span>
+            <p id="modalFolderSyncNote" class="text-[11px] text-purple-700 mt-1"></p>
+          </div>
+        </label>
       </div>
       <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-100 font-medium cursor-pointer">Cancelar</button>
@@ -645,21 +670,21 @@
     }
 
     const SAMPLE_SEPTEMBER = `CARPETA: 1-2026-037169 fuente GDR
-1202640050371691_00005.pdf
-1202640050371691_00006.pdf
-1202640050371691_00007.pdf
-202640050371691_00001.pdf
-202640050371691_00002.pdf
-202640050371691_00003.png
-202640050371691_00004.pdf
-1-2026-040531-Disponibilida personal.pdf
-1-2026-040542-fuente Sr--Am.pdf
+  1202640050371691_00005.pdf
+  1202640050371691_00006.pdf
+  1202640050371691_00007.pdf
+  202640050371691_00001.pdf
+  202640050371691_00002.pdf
+  202640050371691_00003.png
+  202640050371691_00004.pdf
+  1-2026-040531-Disponibilida personal.pdf
+  1-2026-040542-fuente Sr--Am.pdf
 CARPETA: 1-2026-041551-Instructivo de acceso
-1202640050415511_00001.pdf
-1202640050415511_00002.pdf
-1202640050415511_00003.pdf
-1202640050415511_00004.pdf
-1-2026-041551-Instructivo de acceso.zip
+  1202640050415511_00001.pdf
+  1202640050415511_00002.pdf
+  1202640050415511_00003.pdf
+  1202640050415511_00004.pdf
+  1-2026-041551-Instructivo de acceso.zip
 1202640050405311_00001 (1).pdf
 1202640050418681_00001.pdf
 2-2026-041310.pdf
@@ -677,22 +702,22 @@ Acta Posesión No. 83 AMAT ZULUAGA.pdf
 Anexos (10).zip
 Aportes GAN al PND después de sep 2026.docx
 CARPETA: Argentina
-ARN_2025_10-16-1_r04-Transporte-Material-Radiactivo.pdf
-CNEN_2014_Directiva-09-Muestreo-pila-fosfoyeso.pdf
-CNEN_2021_Resolución-288-Limpieza-Tubería-NORM.pdf
-Argentina.zip
+  ARN_2025_10-16-1_r04-Transporte-Material-Radiactivo.pdf
+  CNEN_2014_Directiva-09-Muestreo-pila-fosfoyeso.pdf
+  CNEN_2021_Resolución-288-Limpieza-Tubería-NORM.pdf
+  Argentina.zip
 borrador instructivo Ingreso.docx
 borrador r626--proroga.docx
 borrador r763 personal y director.docx
 borrador respuesta fuente sr y am.docx
 borrador respuesta ra226.docx
 CARPETA: Brasil
-ANSN_Norma-3-01-2025_Requisitos-Radioprotección-Seg-Radiológica-Fuentes.pdf
-ANSN_Norma-4-01-2016_Requisitos-Seg-Radiológica-Instalaciones-Mineras.pdf
-ANSN_Resolución14-2026_Requisitos-Instalaciones-NORM-OyG.pdf
-CNEN_Guía-Reg-Resolución179-2014_Uso-Fosfoyeso-Agricultura-Indus-Cementera.pdf
-CNEN_Resolución179-2014_Uso-Fosfoyeso-Agricultura-Indus-Cementera.pdf
-Brasil.zip
+  ANSN_Norma-3-01-2025_Requisitos-Radioprotección-Seg-Radiológica-Fuentes.pdf
+  ANSN_Norma-4-01-2016_Requisitos-Seg-Radiológica-Instalaciones-Mineras.pdf
+  ANSN_Resolución14-2026_Requisitos-Instalaciones-NORM-OyG.pdf
+  CNEN_Guía-Reg-Resolución179-2014_Uso-Fosfoyeso-Agricultura-Indus-Cementera.pdf
+  CNEN_Resolución179-2014_Uso-Fosfoyeso-Agricultura-Indus-Cementera.pdf
+  Brasil.zip
 Bullets NORM.docx
 c916eaf1-3db5-476f-960a-b4b442f5bc32.jpg
 Circular_DIN-20260300000015_GTO_Energía Nuclear_Convocatoria.pdf
@@ -703,10 +728,10 @@ Colombia_Nuclear_Energy_Evaluation.pptx
 COrreo calificaciones reactor.docx
 Enfoque_de_hitos__(2).pptx
 CARPETA: España
-CSN_GS-11-03_Metodología-evaluación-impacto-radiológico-industrias-NORM.pdf
-CSN_Real Decreto 1029 de 2022_Protección-salud-riesgos-radiaciones-ionizantes.pdf
-CSN_Real Decreto 1217 de 2024_Instalaciones-Nucleares-Radiactivas-Exposición-RI.pdf
-España.zip
+  CSN_GS-11-03_Metodología-evaluación-impacto-radiológico-industrias-NORM.pdf
+  CSN_Real Decreto 1029 de 2022_Protección-salud-riesgos-radiaciones-ionizantes.pdf
+  CSN_Real Decreto 1217 de 2024_Instalaciones-Nucleares-Radiactivas-Exposición-RI.pdf
+  España.zip
 Estrategia_NORM_Colombia.pptx
 Examen Camilo Calderon - RN IAN R1 (17-09-2026).pdf
 Examen Responsable de Mantenimiento 2026-2.docx
@@ -767,15 +792,15 @@ Propuesta Respuesta al legislativo USA-KN.docx
 Septiembre.zip
 Taxonomía Verde de Colombia.pdf
 CARPETA: TdR-BID
-CARPETA: 01-Fortalecimiento ANSN
-GAN-PropFin01-Regulador_V05.pptx
-GAN-PropuestaFinaciación01_Regulador_V2.pdf
-TDR - Plantilla Genérica Consultor Individual-ANSN.docx
-CARPETA: 02-Nucleoelectricidad
-GAN-PropuestaFinaciación_Nucleoelectricidad_V2.pdf
-TDR - Plantilla Genérica Consultor Individual-Nucleoelctricidad.docx
-TDR - Plantilla Genérica Consultor Individual.docx
-TDR - Plantilla Genérica Firma.docx`;
+  CARPETA: 01-Fortalecimiento ANSN
+    GAN-PropFin01-Regulador_V05.pptx
+    GAN-PropuestaFinaciación01_Regulador_V2.pdf
+    TDR - Plantilla Genérica Consultor Individual-ANSN.docx
+  CARPETA: 02-Nucleoelectricidad
+    GAN-PropuestaFinaciación_Nucleoelectricidad_V2.pdf
+    TDR - Plantilla Genérica Consultor Individual-Nucleoelctricidad.docx
+    TDR - Plantilla Genérica Consultor Individual.docx
+    TDR - Plantilla Genérica Firma.docx`;
 
     const SAMPLE_AUGUST = `CARPETA: 1-2026-032145 trámite medicina nuclear
 1202640050321451_00001.pdf
@@ -980,38 +1005,80 @@ VPN_Configuracion_MinEnergia.pdf`;
       return { id: 2, reason: "Asignado a gestión técnica de trámites/instalaciones" };
     }
 
-    // Parse input text into raw unique items
+    // Parse input text into raw unique items with auto-recovery for pasted Word binary
     function extractItemsFromText(rawText) {
       if (!rawText) return [];
 
+      let processedText = rawText;
+
       // Check if user accidentally pasted raw binary Word (.docx) data
-      if (rawText.includes("[Content_Types].xml") || (rawText.trim().startsWith("PK") && rawText.includes("word/"))) {
-        showAlert("⚠️ El contenido pegado contiene los caracteres binarios de un archivo Word (.docx). Para cargarlo, haz clic en '📄 Cargar Archivo Word / Texto' y selecciona tu documento Word.", "error");
-        return [];
+      if (processedText.includes("[Content_Types].xml") || (processedText.trim().startsWith("PK") && processedText.length > 50)) {
+        const recoveredLines = [];
+
+        // 1. Match XML <w:t> tags from Word document
+        const wtMatches = [...processedText.matchAll(/<w:t[^>]*>([^<]+)<\/w:t>/g)];
+        if (wtMatches.length > 0) {
+          wtMatches.forEach(m => {
+            const val = m[1].trim();
+            if (val && val.length > 2 && !val.startsWith("PK")) {
+              recoveredLines.push(val);
+            }
+          });
+        }
+
+        // 2. Match common file patterns (e.g., radicados 1-202..., 2-202..., .pdf, .docx, .zip)
+        const fileRegex = /([a-zA-Z0-9_\-\u00C0-\u017F\s]{2,120}\.(?:pdf|docx|doc|xlsx|xls|pptx|ppt|zip|rar|jpg|png|csv|txt)|[1-3]-202[0-9]-[0-9]+[a-zA-Z0-9_\-\u00C0-\u017F\s]*)/gi;
+        const fnMatches = [...processedText.matchAll(fileRegex)];
+        if (fnMatches.length > 0) {
+          fnMatches.forEach(m => {
+            const val = m[1].trim();
+            if (val && val.length > 4 && !val.startsWith("PK")) {
+              recoveredLines.push(val);
+            }
+          });
+        }
+
+        if (recoveredLines.length > 0) {
+          const uniqueRecovered = [...new Set(recoveredLines)];
+          const cleanedText = uniqueRecovered.join("\n");
+          document.getElementById("txtCurrentMonth").value = cleanedText;
+          processedText = cleanedText;
+          showAlert(`✓ Se recuperaron automáticamente ${uniqueRecovered.length} documentos del archivo Word pegado. Procediendo a clasificar...`, "success");
+        } else {
+          showAlert("⚠️ El contenido pegado contiene los caracteres binarios internos de un archivo Word (.docx). Para cargarlo limpiamente, haz clic en '📄 Cargar Archivo Word / Texto' y selecciona tu archivo.", "error");
+          return [];
+        }
       }
 
-      const lines = rawText.split("\n");
+      const lines = processedText.split("\n");
       const items = [];
       let currentFolder = "";
       const seen = new Set();
 
       for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
+        const rawLine = lines[i];
+        let line = rawLine.trim();
         if (!line) continue;
         if (line.startsWith("REPORTE DE PRODUCCIONES") || line.startsWith("1. DESGLOSE") || line.startsWith("2. REUNIONES")) continue;
         if (line.includes("No se encontró archivo calendar.ics")) continue;
 
+        // Check if line was indented with 2+ spaces or tab
+        const isIndented = /^\s{2,}|\t/.test(rawLine);
+
         // Clean bullet points or numbered lists if pasted from word
-        line = line.replace(/^[\s•\-\*]+/, '').trim();
+        line = line.replace(/^[\s•\-\*\u2022\u25E6\u25AA\u25AB\u2013\u2014]+/, '').trim();
+        if (/^\d+[\.\)]\s+/.test(line) && !/^\d-202/i.test(line)) {
+          line = line.replace(/^\d+[\.\)]\s+/, '').trim();
+        }
         if (!line) continue;
 
-        // Deduplication to strictly satisfy "sin repetirla"
-        const dedupeKey = line.toLowerCase();
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
+        const lower = line.toLowerCase();
 
         if (line.toUpperCase().startsWith("CARPETA:")) {
           currentFolder = line.substring(line.indexOf(":") + 1).trim();
+          const dedupeKey = `folder:::${currentFolder.toLowerCase()}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
           items.push({
             name: line,
             folderContext: currentFolder,
@@ -1020,9 +1087,39 @@ VPN_Configuracion_MinEnergia.pdf`;
           continue;
         }
 
+        // Determine if file belongs to currentFolder
+        let belongsToFolder = false;
+        if (currentFolder) {
+          if (isIndented) {
+            belongsToFolder = true;
+          } else {
+            const folderLower = currentFolder.toLowerCase();
+            if (folderLower === "argentina" && (lower.includes("arn") || lower.includes("cnen") || lower === "argentina.zip")) {
+              belongsToFolder = true;
+            } else if (folderLower === "brasil" && (lower.includes("ansn") || lower.includes("cnen") || lower === "brasil.zip")) {
+              belongsToFolder = true;
+            } else if (folderLower === "españa" && (lower.includes("csn") || lower === "españa.zip")) {
+              belongsToFolder = true;
+            } else if (folderLower.startsWith("1-2026-037169") && (lower.includes("1202640050371691") || lower.includes("202640050371691") || lower.includes("040531-disponibilida") || lower.includes("040542-fuente"))) {
+              belongsToFolder = true;
+            } else if (folderLower.startsWith("1-2026-041551") && (lower.includes("1202640050415511") || lower.includes("041551-instructivo de acceso"))) {
+              belongsToFolder = true;
+            } else if (folderLower.includes("tdr") || folderLower.includes("ansn") || folderLower.includes("nucleoelectricidad")) {
+              if (lower.includes("tdr") || lower.includes("propfin") || lower.includes("propuestafinaciación") || lower.includes("propuestafinanciacion")) {
+                belongsToFolder = true;
+              }
+            }
+          }
+        }
+
+        const assignedFolder = belongsToFolder ? currentFolder : "";
+        const dedupeKey = `${assignedFolder}:::${line.toLowerCase()}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
         items.push({
           name: line,
-          folderContext: currentFolder,
+          folderContext: assignedFolder,
           isFolder: false
         });
       }
@@ -1040,17 +1137,25 @@ VPN_Configuracion_MinEnergia.pdf`;
         return;
       }
 
-      // UI loading state
+      // UI loading state for both buttons
       const btnAI = document.getElementById("btnClassifyAI");
+      const btnAIInline = document.getElementById("btnClassifyAIInline");
       const aiSpinner = document.getElementById("aiSpinner");
       const aiIcon = document.getElementById("aiIcon");
       const aiBtnText = document.getElementById("aiBtnText");
 
-      btnAI.disabled = true;
-      btnAI.classList.add("opacity-75", "cursor-wait");
-      aiSpinner.classList.remove("hidden");
-      aiIcon.classList.add("hidden");
-      aiBtnText.textContent = "Clasificando con IA...";
+      if (btnAI) {
+        btnAI.disabled = true;
+        btnAI.classList.add("opacity-75", "cursor-wait");
+      }
+      if (btnAIInline) {
+        btnAIInline.disabled = true;
+        btnAIInline.classList.add("opacity-75", "cursor-wait");
+        btnAIInline.innerHTML = "<span>🔄</span> Clasificando con IA...";
+      }
+      if (aiSpinner) aiSpinner.classList.remove("hidden");
+      if (aiIcon) aiIcon.classList.add("hidden");
+      if (aiBtnText) aiBtnText.textContent = "Clasificando con IA...";
 
       try {
         const response = await fetch("/api/classify", {
@@ -1068,50 +1173,94 @@ VPN_Configuracion_MinEnergia.pdf`;
 
         parsedItems = rawItems.map((item, idx) => {
           const res = classifications[idx] || classifyDocumentLocal(item.name, item.folderContext);
+          const parsedId = parseInt(res.obligationId || res.id || 2, 10);
           return {
             name: item.name,
             folderContext: item.folderContext,
             isFolder: item.isFolder,
-            assignedObligationId: res.obligationId || res.id || 2,
+            assignedObligationId: isNaN(parsedId) ? 2 : parsedId,
             reason: res.reason || "Clasificado con IA"
           };
         });
 
-        // Garantizar cobertura balanceada de las 7 obligaciones
+        // Garantizar cobertura balanceada de las 7 obligaciones e integridad de carpetas
         parsedItems = balanceObligationsCoverageClient(rawItems, parsedItems);
 
-        updateStatistics();
+        // Asegurar que la vista de tarjetas esté activa y visible
+        resetTabs();
+        const tabCards = document.getElementById("tabCardsView");
+        if (tabCards) tabCards.className = "px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all font-semibold cursor-pointer";
+        const cardsCont = document.getElementById("cardsContainer");
+        if (cardsCont) cardsCont.classList.remove("hidden");
+        const quickSearchInput = document.getElementById("quickSearch");
+        if (quickSearchInput) quickSearchInput.value = "";
+
+        // 1. RENDERIZAR VISTAS PRIMERO
         renderAllViews();
+
+        // 2. ACTUALIZAR ESTADÍSTICAS Y PILLS
+        updateStatistics();
 
         const providerText = data.provider === "gemini" 
           ? "Clasificación completada con IA Gemini (gemini-3.8-flash) • Cobertura 100% (7/7)" 
           : "Clasificación completada mediante Motor Contractual GAN • Cobertura 100% (7/7)";
         
         setEngineStatus(providerText, data.provider === "gemini" ? "✨ Gemini 3.8 Flash" : "⚙️ Reglas GAN");
-        showAlert(`¡Éxito! ${parsedItems.length} producciones clasificadas sin repetición con cobertura en las 7 obligaciones.`, "success");
+        showAlert(`¡Éxito! ${parsedItems.length} producciones clasificadas con cobertura en las 7 obligaciones contractuales.`, "success");
+
+        // Desplazar suavemente a la visualización de las 7 secciones
+        if (cardsCont) {
+          cardsCont.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
 
       } catch (err) {
         console.warn("AI endpoint error, running deterministic rules:", err);
         classifyWithRules();
         showAlert("Clasificado mediante motor de reglas contractuales.", "success");
       } finally {
-        btnAI.disabled = false;
-        btnAI.classList.remove("opacity-75", "cursor-wait");
-        aiSpinner.classList.add("hidden");
-        aiIcon.classList.remove("hidden");
-        aiBtnText.textContent = "Clasificar con IA";
+        if (btnAI) {
+          btnAI.disabled = false;
+          btnAI.classList.remove("opacity-75", "cursor-wait");
+        }
+        if (btnAIInline) {
+          btnAIInline.disabled = false;
+          btnAIInline.classList.remove("opacity-75", "cursor-wait");
+          btnAIInline.innerHTML = "<span>✨</span> Clasificar con IA (Gemini)";
+        }
+        if (aiSpinner) aiSpinner.classList.add("hidden");
+        if (aiIcon) aiIcon.classList.remove("hidden");
+        if (aiBtnText) aiBtnText.textContent = "Clasificar con IA";
       }
     }
 
-    // Balanceador client-side para garantizar cobertura en las 7 obligaciones y priorización 1 a 6
+    // Balanceador client-side para garantizar cobertura en las 7 obligaciones y mantener integridad de carpetas
     function balanceObligationsCoverageClient(items, classifications) {
       if (!Array.isArray(items) || items.length < 7) {
         return classifications;
       }
 
+      // 1. Sincronizar herencia: TODOS los archivos contenidos dentro de una carpeta DEBEN tener la misma obligación que dicha carpeta
+      const folderObligationMap = new Map();
+      items.forEach((it, idx) => {
+        if (it.isFolder) {
+          const fName = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+          folderObligationMap.set(fName, parseInt(classifications[idx].assignedObligationId, 10));
+        }
+      });
+
+      items.forEach((it, idx) => {
+        if (!it.isFolder && it.folderContext) {
+          const fName = it.folderContext.trim().toLowerCase();
+          if (folderObligationMap.has(fName)) {
+            classifications[idx].assignedObligationId = folderObligationMap.get(fName);
+            classifications[idx].reason = `Documento contenido en carpeta "${it.folderContext}"`;
+          }
+        }
+      });
+
       const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
       classifications.forEach(c => {
-        const id = c.assignedObligationId;
+        const id = parseInt(c.assignedObligationId, 10);
         if (counts[id] !== undefined) counts[id]++;
       });
 
@@ -1134,8 +1283,13 @@ VPN_Configuracion_MinEnergia.pdf`;
         let bestIndex = -1;
         let bestScore = -1;
 
+        // Solo rebalancear documentos raíz individuales para jamás separar archivos de sus carpetas
         for (let i = 0; i < items.length; i++) {
-          const currentOb = classifications[i].assignedObligationId;
+          if (items[i].folderContext && !items[i].isFolder) {
+            continue; // NO separar archivos dentro de carpetas
+          }
+
+          const currentOb = parseInt(classifications[i].assignedObligationId, 10);
           if (counts[currentOb] > 1) {
             const lowerName = (items[i].name + ' ' + (items[i].folderContext || '')).toLowerCase();
             const kwList = keywordsByOb[targetOb] || [];
@@ -1159,11 +1313,22 @@ VPN_Configuracion_MinEnergia.pdf`;
         }
 
         if (bestIndex !== -1) {
-          const oldOb = classifications[bestIndex].assignedObligationId;
+          const oldOb = parseInt(classifications[bestIndex].assignedObligationId, 10);
           counts[oldOb]--;
           counts[targetOb]++;
           classifications[bestIndex].assignedObligationId = targetOb;
           classifications[bestIndex].reason = `Asignado para garantizar cobertura total de la Obligación ${targetOb} (${classifications[bestIndex].reason || 'documento afín'})`;
+
+          // Si el elemento rebalanceado era una carpeta completa, mover también todos sus hijos
+          if (items[bestIndex].isFolder) {
+            const folderName = (items[bestIndex].folderContext || items[bestIndex].name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+            items.forEach((childIt, childIdx) => {
+              if (!childIt.isFolder && childIt.folderContext && childIt.folderContext.trim().toLowerCase() === folderName) {
+                classifications[childIdx].assignedObligationId = targetOb;
+                classifications[childIdx].reason = `Documento contenido en carpeta "${childIt.folderContext}"`;
+              }
+            });
+          }
         }
       });
 
@@ -1182,68 +1347,167 @@ VPN_Configuracion_MinEnergia.pdf`;
 
       parsedItems = rawItems.map(item => {
         const res = classifyDocumentLocal(item.name, item.folderContext);
+        const parsedId = parseInt(res.id || res.obligationId || 2, 10);
         return {
           name: item.name,
           folderContext: item.folderContext,
           isFolder: item.isFolder,
-          assignedObligationId: res.id,
+          assignedObligationId: isNaN(parsedId) ? 2 : parsedId,
           reason: res.reason
         };
       });
 
-      // Garantizar que ninguna quede en 0
+      // Garantizar que ninguna quede en 0 y sincronizar herencia de carpetas
       parsedItems = balanceObligationsCoverageClient(rawItems, parsedItems);
 
-      updateStatistics();
+      // Asegurar que la vista de tarjetas esté activa y visible
+      resetTabs();
+      const tabCards = document.getElementById("tabCardsView");
+      if (tabCards) tabCards.className = "px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all font-semibold cursor-pointer";
+      const cardsCont = document.getElementById("cardsContainer");
+      if (cardsCont) cardsCont.classList.remove("hidden");
+      const quickSearchInput = document.getElementById("quickSearch");
+      if (quickSearchInput) quickSearchInput.value = "";
+
+      // 1. Renderizar vistas
       renderAllViews();
+
+      // 2. Actualizar estadísticas y pills de secciones
+      updateStatistics();
+
       setEngineStatus("Clasificado mediante Motor de Reglas Contractuales GAN (Regla 1-202... / SECOP II • Cobertura 7/7)", "⚙️ Reglas GAN");
       showAlert(`¡Éxito! ${parsedItems.length} documentos asignados a las 7 obligaciones sin repetición.`, "success");
+
+      if (cardsCont) {
+        cardsCont.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     }
 
     function setEngineStatus(text, badge) {
-      document.getElementById("engineStatusText").textContent = text;
-      document.getElementById("engineBadge").textContent = badge;
+      try {
+        const elText = document.getElementById("engineStatusText");
+        if (elText) elText.textContent = text;
+        const elBadge = document.getElementById("engineBadge");
+        if (elBadge) elBadge.textContent = badge;
+      } catch (e) {
+        console.error("setEngineStatus error:", e);
+      }
+    }
+
+    // Estado del filtro rápido de obligación (0 = todas las 7 obligaciones)
+    let activeObligationFilter = 0;
+
+    function updateObligationPills() {
+      const container = document.getElementById("obligationPillsContainer");
+      if (!container) return;
+      container.innerHTML = "";
+
+      const totalItems = parsedItems.length;
+
+      // Pill: Todas
+      const allBtn = document.createElement("button");
+      allBtn.type = "button";
+      const isAllActive = activeObligationFilter === 0;
+      allBtn.className = `px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+        isAllActive 
+          ? 'bg-sky-600 text-white font-bold shadow-xs' 
+          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+      }`;
+      allBtn.innerHTML = `<span>Todas (7)</span><span class="px-1.5 py-0.2 rounded-full text-[10px] ${isAllActive ? 'bg-sky-700 text-white' : 'bg-slate-200 text-slate-700'}">${totalItems}</span>`;
+      allBtn.onclick = () => {
+        activeObligationFilter = 0;
+        updateObligationPills();
+        renderCardsView();
+      };
+      container.appendChild(allBtn);
+
+      // Pills 1 a 7
+      OBLIGACIONES.forEach(ob => {
+        const count = parsedItems.filter(it => parseInt(it.assignedObligationId, 10) === ob.id).length;
+        const isActive = activeObligationFilter === ob.id;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `px-2 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] ${
+          isActive 
+            ? 'bg-sky-600 text-white font-bold shadow-xs' 
+            : count > 0 
+              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium' 
+              : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+        }`;
+
+        const shortLabel = ob.id === 1 ? '1. Política/Hitos' :
+                           ob.id === 2 ? '2. Instalaciones/Trámites' :
+                           ob.id === 3 ? '3. Contratos/BID' :
+                           ob.id === 4 ? '4. Mitigación/Riesgos' :
+                           ob.id === 5 ? '5. Mesas/NORM' :
+                           ob.id === 6 ? '6. Actas/Congreso' :
+                           '7. Administrativas';
+
+        btn.innerHTML = `<span>${shortLabel}</span><span class="px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-sky-700 text-white' : count > 0 ? 'bg-slate-200 text-slate-700' : 'bg-amber-200 text-amber-800'}">${count}</span>`;
+        btn.onclick = () => {
+          activeObligationFilter = isActive ? 0 : ob.id;
+          updateObligationPills();
+          renderCardsView();
+        };
+        container.appendChild(btn);
+      });
     }
 
     function updateStatistics() {
-      const totalCount = parsedItems.length;
-      const foldersCount = parsedItems.filter(p => p.isFolder).length;
-      const ob2Count = parsedItems.filter(p => p.assignedObligationId === 2).length;
+      try {
+        const totalCount = parsedItems.length;
+        const foldersCount = parsedItems.filter(p => p.isFolder).length;
+        const ob2Count = parsedItems.filter(p => parseInt(p.assignedObligationId, 10) === 2).length;
 
-      document.getElementById("statTotalItems").textContent = totalCount;
-      document.getElementById("statAssignedItems").textContent = totalCount;
-      document.getElementById("statOb2Items").textContent = ob2Count;
-      document.getElementById("statFolders").textContent = foldersCount;
+        const elTotal = document.getElementById("statTotalItems");
+        if (elTotal) elTotal.textContent = totalCount;
 
-      const coveredObligations = new Set(parsedItems.map(p => p.assignedObligationId)).size;
-      const statCoverageElem = document.getElementById("statCoverage");
-      const statCoverageNoteElem = document.getElementById("statCoverageNote");
-      if (statCoverageElem) {
-        statCoverageElem.textContent = `${coveredObligations} / 7`;
-        if (coveredObligations === 7) {
-          statCoverageElem.className = "text-2xl font-bold text-emerald-600";
-          if (statCoverageNoteElem) {
-            statCoverageNoteElem.textContent = "✓ 100% Cobertura completa (7/7 cubiertas)";
-            statCoverageNoteElem.className = "text-[10px] text-emerald-700 font-medium";
-          }
-        } else {
-          statCoverageElem.className = "text-2xl font-bold text-amber-600";
-          if (statCoverageNoteElem) {
-            statCoverageNoteElem.textContent = `⚠️ ${7 - coveredObligations} obligación(es) sin evidencias`;
-            statCoverageNoteElem.className = "text-[10px] text-amber-700 font-medium";
+        const elOb2 = document.getElementById("statOb2Items");
+        if (elOb2) elOb2.textContent = ob2Count;
+
+        const elFolders = document.getElementById("statFolders");
+        if (elFolders) elFolders.textContent = foldersCount;
+
+        const coveredObligations = new Set(parsedItems.map(p => parseInt(p.assignedObligationId, 10))).size;
+        const statCoverageElem = document.getElementById("statCoverage");
+        const statCoverageNoteElem = document.getElementById("statCoverageNote");
+        if (statCoverageElem) {
+          statCoverageElem.textContent = `${coveredObligations} / 7`;
+          if (coveredObligations === 7) {
+            statCoverageElem.className = "text-2xl font-bold text-emerald-600";
+            if (statCoverageNoteElem) {
+              statCoverageNoteElem.textContent = "✓ 100% con evidencias (7/7)";
+              statCoverageNoteElem.className = "text-[10px] text-emerald-700 font-medium";
+            }
+          } else {
+            statCoverageElem.className = "text-2xl font-bold text-amber-600";
+            if (statCoverageNoteElem) {
+              statCoverageNoteElem.textContent = `⚠️ ${7 - coveredObligations} obligación(es) sin evidencias`;
+              statCoverageNoteElem.className = "text-[10px] text-amber-700 font-medium";
+            }
           }
         }
+
+        updateObligationPills();
+      } catch (err) {
+        console.error("updateStatistics error:", err);
       }
     }
 
     function renderCardsView() {
       const container = document.getElementById("cardsContainer");
+      if (!container) return;
       container.innerHTML = "";
-      const searchQuery = document.getElementById("quickSearch").value.toLowerCase().trim();
+      const searchQuery = (document.getElementById("quickSearch")?.value || "").toLowerCase().trim();
 
       OBLIGACIONES.forEach(ob => {
+        // Filtrado por píldora seleccionada
+        if (activeObligationFilter !== 0 && ob.id !== activeObligationFilter) {
+          return;
+        }
+
         const items = parsedItems.filter(item => {
-          if (item.assignedObligationId !== ob.id) return false;
+          if (parseInt(item.assignedObligationId, 10) !== ob.id) return false;
           if (searchQuery) {
             return item.name.toLowerCase().includes(searchQuery);
           }
@@ -1253,17 +1517,27 @@ VPN_Configuracion_MinEnergia.pdf`;
         const card = document.createElement("div");
         card.className = "bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between overflow-hidden hover:border-sky-300 transition-all";
 
+        const isTechnicalPriority = ob.id >= 1 && ob.id <= 6;
+        const priorityTag = isTechnicalPriority
+          ? `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold px-2 py-0.5 rounded text-[10px]">⚖️ Prioridad Técnica Contractual</span>`
+          : `<span class="bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded text-[10px]">📋 Actividades Generales y Administrativas</span>`;
+
         let headerHtml = `
           <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-start gap-2">
             <div>
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <span class="w-6 h-6 rounded-full bg-sky-600 text-white font-bold text-xs flex items-center justify-center shrink-0">${ob.id}</span>
-                <h4 class="text-xs font-bold text-slate-800 leading-tight">${ob.titulo}</h4>
+                <span class="text-xs font-bold text-slate-800 leading-tight">Sección ${ob.id} de 7: ${escapeHtml(ob.titulo)}</span>
               </div>
-              <p class="text-[11px] text-slate-500 mt-1 line-clamp-2" title="${ob.descripcion}">${ob.descripcion}</p>
+              <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                ${priorityTag}
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1 line-clamp-2" title="${escapeHtml(ob.descripcion)}">${escapeHtml(ob.descripcion)}</p>
             </div>
-            <div class="flex items-center gap-1 shrink-0">
-              <span class="bg-sky-100 text-sky-800 font-bold text-xs px-2 py-0.5 rounded-full">${items.length}</span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="${items.length > 0 ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800'} font-bold text-xs px-2.5 py-0.5 rounded-full">
+                ${items.length} ${items.length === 1 ? 'doc' : 'docs'}
+              </span>
               <button onclick="copyObligationPlainList(${ob.id})" class="text-slate-600 hover:text-sky-600 p-1.5 rounded hover:bg-slate-200 text-xs font-semibold cursor-pointer" title="Copiar solo listado de archivos">
                 📋
               </button>
@@ -1271,40 +1545,146 @@ VPN_Configuracion_MinEnergia.pdf`;
           </div>
         `;
 
-        let listHtml = `<div class="p-3 divide-y divide-slate-100 max-h-80 overflow-y-auto custom-scrollbar flex-1">`;
+        let listHtml = `<div class="p-3 divide-y divide-slate-100 max-h-96 overflow-y-auto custom-scrollbar flex-1 space-y-2">`;
         if (items.length === 0) {
-          listHtml += `<p class="text-xs text-slate-400 italic py-6 text-center">Sin documentos asignados a esta obligación.</p>`;
+          listHtml += `
+            <div class="py-8 px-3 text-center">
+              <p class="text-xs text-amber-700 font-semibold">⚠️ Sin documentos asignados a esta sección en el filtro actual.</p>
+              <p class="text-[11px] text-slate-400 mt-1">Usa el botón "Mover" en cualquier documento de otra sección para asignarlo aquí.</p>
+            </div>
+          `;
         } else {
-          items.forEach(item => {
-            const indexInGlobal = parsedItems.indexOf(item);
-            if (item.isFolder) {
-              listHtml += `
-                <div class="py-1.5 flex items-center justify-between text-xs font-bold text-purple-900 bg-purple-50 px-2 rounded my-1">
-                  <span class="flex items-center gap-1.5 truncate" title="${escapeHtml(item.name)}&#10;Justificación: ${item.reason}">📁 ${escapeHtml(item.name)}</span>
-                  <div class="flex items-center gap-1 shrink-0">
-                    <button onclick="copySingleName('${escapeJsString(item.name)}')" class="text-[11px] text-purple-700 hover:text-purple-900 px-1.5 py-0.5 rounded hover:bg-purple-100 font-medium cursor-pointer" title="Copiar nombre">Copiar</button>
-                    <button onclick="openMoveModal(${indexInGlobal})" class="text-[11px] text-purple-700 hover:underline px-1 py-0.5 font-medium cursor-pointer">Mover</button>
+          // 1. Agrupar carpetas y sus archivos contenidos
+          const processedFolderKeys = new Set();
+          const folderItems = items.filter(it => it.isFolder);
+
+          folderItems.forEach(fItem => {
+            const fKey = (fItem.folderContext || fItem.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+            processedFolderKeys.add(fKey);
+            const folderChildren = items.filter(it => !it.isFolder && (it.folderContext || '').trim().toLowerCase() === fKey);
+            const fGlobalIdx = parsedItems.indexOf(fItem);
+
+            listHtml += `
+              <div class="border border-purple-200/90 bg-purple-50/50 rounded-xl overflow-hidden shadow-xs my-2">
+                <div class="px-3 py-2 bg-gradient-to-r from-purple-100/90 to-indigo-100/60 border-b border-purple-200/80 flex items-center justify-between text-xs gap-2">
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span class="text-base leading-none">📁</span>
+                    <span class="font-bold text-purple-950 truncate" title="${escapeHtml(fItem.name)}">${escapeHtml(fItem.name)}</span>
+                    <span class="bg-purple-200/90 text-purple-900 font-bold text-[10px] px-2 py-0.5 rounded-full shrink-0">
+                      ${folderChildren.length} ${folderChildren.length === 1 ? 'doc contenido' : 'docs contenidos'}
+                    </span>
                   </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="copyFolderFiles('${escapeJsString(fItem.name)}')" class="text-[11px] text-purple-800 hover:text-purple-950 px-2 py-0.5 rounded hover:bg-purple-200 font-medium cursor-pointer" title="Copiar todos los archivos contenidos">
+                      📋 Copiar
+                    </button>
+                    <button onclick="openMoveModal(${fGlobalIdx})" class="text-[11px] bg-purple-600 hover:bg-purple-700 text-white px-2 py-0.5 rounded font-semibold cursor-pointer shadow-xs" title="Mover carpeta y todos sus documentos a otra sección">
+                      Mover carpeta
+                    </button>
+                  </div>
+                </div>
+                <div class="p-2 space-y-1 bg-white/70 divide-y divide-purple-100/50">
+            `;
+
+            if (folderChildren.length === 0) {
+              listHtml += `
+                <div class="py-2 px-2 text-slate-400 text-[11px] italic">
+                  (Carpeta sin archivos adicionales listados en esta sección)
                 </div>
               `;
             } else {
-              listHtml += `
-                <div class="py-1.5 flex items-center justify-between gap-2 text-xs group hover:bg-slate-50 px-1 rounded transition-colors">
-                  <div class="truncate flex items-center gap-1.5 flex-1" title="${escapeHtml(item.name)}&#10;Justificación: ${item.reason}">
-                    <span class="text-slate-400">•</span>
-                    <span class="font-mono text-slate-700 truncate">${escapeHtml(item.name)}</span>
+              folderChildren.forEach(child => {
+                const childGlobalIdx = parsedItems.indexOf(child);
+                const isRad = /^(1|2|3)-202/i.test(child.name) || /^\d{14,18}/.test(child.name);
+                listHtml += `
+                  <div class="pt-1.5 pb-1 flex items-center justify-between gap-2 text-xs hover:bg-purple-50/50 px-1 rounded transition-colors group">
+                    <div class="truncate flex items-center gap-1.5 flex-1 pl-2" title="${escapeHtml(child.name)}&#10;Justificación: ${escapeHtml(child.reason || '')}">
+                      <span class="${isRad ? 'text-sky-600 font-bold' : 'text-purple-400'}">${isRad ? '🏛️' : '↳ •'}</span>
+                      <span class="font-mono text-slate-700 truncate ${isRad ? 'font-semibold text-sky-900' : ''}">${escapeHtml(child.name)}</span>
+                      ${child.reason ? `<span class="hidden sm:inline text-[10px] text-slate-400 truncate max-w-[130px]">(${escapeHtml(child.reason)})</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                      <button onclick="copySingleName('${escapeJsString(child.name)}')" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Copiar nombre">📋</button>
+                      <button onclick="openMoveModal(${childGlobalIdx})" class="p-1 text-slate-400 hover:text-purple-600 rounded text-xs cursor-pointer" title="Reasignar archivo">✏️</button>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
-                    <button onclick="copySingleName('${escapeJsString(item.name)}')" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Copiar nombre del archivo">
-                      📋
-                    </button>
-                    <button onclick="openMoveModal(${indexInGlobal})" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Cambiar de obligación">
-                      ✏️
+                `;
+              });
+            }
+
+            listHtml += `</div></div>`;
+          });
+
+          // 2. Archivos con carpeta pero sin header explícito de carpeta
+          const orphanFolderChildren = items.filter(it => !it.isFolder && it.folderContext && !processedFolderKeys.has(it.folderContext.trim().toLowerCase()));
+          const orphanGrouped = new Map();
+          orphanFolderChildren.forEach(c => {
+            const k = c.folderContext.trim().toLowerCase();
+            if (!orphanGrouped.has(k)) orphanGrouped.set(k, []);
+            orphanGrouped.get(k).push(c);
+          });
+
+          orphanGrouped.forEach((childrenList, fKey) => {
+            const sampleName = childrenList[0]?.folderContext || fKey;
+            listHtml += `
+              <div class="border border-purple-200/90 bg-purple-50/50 rounded-xl overflow-hidden shadow-xs my-2">
+                <div class="px-3 py-2 bg-gradient-to-r from-purple-100/90 to-indigo-100/60 border-b border-purple-200/80 flex items-center justify-between text-xs gap-2">
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span class="text-base leading-none">📁</span>
+                    <span class="font-bold text-purple-950 truncate">CARPETA: ${escapeHtml(sampleName)}</span>
+                    <span class="bg-purple-200/90 text-purple-900 font-bold text-[10px] px-2 py-0.5 rounded-full shrink-0">
+                      ${childrenList.length} ${childrenList.length === 1 ? 'doc contenido' : 'docs contenidos'}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="copyFolderFiles('${escapeJsString(sampleName)}')" class="text-[11px] text-purple-800 hover:text-purple-950 px-2 py-0.5 rounded hover:bg-purple-200 font-medium cursor-pointer" title="Copiar todos los archivos">
+                      📋 Copiar
                     </button>
                   </div>
                 </div>
+                <div class="p-2 space-y-1 bg-white/70 divide-y divide-purple-100/50">
+            `;
+            childrenList.forEach(child => {
+              const childGlobalIdx = parsedItems.indexOf(child);
+              const isRad = /^(1|2|3)-202/i.test(child.name) || /^\d{14,18}/.test(child.name);
+              listHtml += `
+                <div class="pt-1.5 pb-1 flex items-center justify-between gap-2 text-xs hover:bg-purple-50/50 px-1 rounded transition-colors group">
+                  <div class="truncate flex items-center gap-1.5 flex-1 pl-2" title="${escapeHtml(child.name)}&#10;Justificación: ${escapeHtml(child.reason || '')}">
+                    <span class="${isRad ? 'text-sky-600 font-bold' : 'text-purple-400'}">${isRad ? '🏛️' : '↳ •'}</span>
+                    <span class="font-mono text-slate-700 truncate ${isRad ? 'font-semibold text-sky-900' : ''}">${escapeHtml(child.name)}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                    <button onclick="copySingleName('${escapeJsString(child.name)}')" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Copiar nombre">📋</button>
+                    <button onclick="openMoveModal(${childGlobalIdx})" class="p-1 text-slate-400 hover:text-purple-600 rounded text-xs cursor-pointer" title="Reasignar archivo">✏️</button>
+                  </div>
+                </div>
               `;
-            }
+            });
+            listHtml += `</div></div>`;
+          });
+
+          // 3. Documentos raíz independientes (sin carpeta contenedora)
+          const rootDocuments = items.filter(it => !it.isFolder && !it.folderContext);
+          rootDocuments.forEach(item => {
+            const indexInGlobal = parsedItems.indexOf(item);
+            const isRadicado = /^(1|2|3)-202/i.test(item.name) || /^\d{14,18}/.test(item.name);
+            listHtml += `
+              <div class="py-1.5 flex items-center justify-between gap-2 text-xs group hover:bg-slate-50 px-1.5 rounded-lg transition-colors">
+                <div class="truncate flex items-center gap-1.5 flex-1" title="${escapeHtml(item.name)}&#10;Justificación: ${escapeHtml(item.reason || '')}">
+                  <span class="${isRadicado ? 'text-sky-600 font-bold' : 'text-slate-400'}">${isRadicado ? '🏛️' : '•'}</span>
+                  <span class="font-mono text-slate-700 truncate ${isRadicado ? 'font-semibold text-sky-900' : ''}">${escapeHtml(item.name)}</span>
+                  ${item.reason ? `<span class="hidden sm:inline text-[10px] text-slate-400 truncate max-w-[140px]" title="${escapeHtml(item.reason)}">(${escapeHtml(item.reason)})</span>` : ''}
+                </div>
+                <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                  <button onclick="copySingleName('${escapeJsString(item.name)}')" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Copiar nombre del archivo">
+                    📋
+                  </button>
+                  <button onclick="openMoveModal(${indexInGlobal})" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Cambiar de obligación">
+                    ✏️
+                  </button>
+                </div>
+              </div>
+            `;
           });
         }
         listHtml += `</div>`;
@@ -1327,10 +1707,11 @@ VPN_Configuracion_MinEnergia.pdf`;
 
     function renderWordTable() {
       const tbody = document.getElementById("wordTableBody");
+      if (!tbody) return;
       tbody.innerHTML = "";
 
       OBLIGACIONES.forEach(ob => {
-        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === ob.id);
 
         const row = document.createElement("tr");
         row.className = "hover:bg-slate-50 transition-colors";
@@ -1339,15 +1720,36 @@ VPN_Configuracion_MinEnergia.pdf`;
         if (items.length === 0) {
           textBlock += "(No se registraron evidencias para esta obligación en el período)";
         } else {
+          const processedFolders = new Set();
           items.forEach(it => {
-            textBlock += `${it.name}\n`;
+            if (it.isFolder) {
+              const fKey = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+              processedFolders.add(fKey);
+              textBlock += `📁 ${it.name}\n`;
+              const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+              children.forEach(c => {
+                textBlock += `   • ${c.name}\n`;
+              });
+            } else if (!it.folderContext) {
+              textBlock += `• ${it.name}\n`;
+            } else {
+              const fKey = it.folderContext.trim().toLowerCase();
+              if (!processedFolders.has(fKey)) {
+                processedFolders.add(fKey);
+                textBlock += `📁 CARPETA: ${it.folderContext}\n`;
+                const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+                children.forEach(c => {
+                  textBlock += `   • ${c.name}\n`;
+                });
+              }
+            }
           });
         }
 
         row.innerHTML = `
           <td class="p-3 text-center font-bold text-slate-600 border-r border-slate-200 align-top">${ob.id}</td>
           <td class="p-3 border-r border-slate-200 align-top">
-            <p class="font-semibold text-slate-800">${ob.descripcion}</p>
+            <p class="font-semibold text-slate-800">${escapeHtml(ob.descripcion)}</p>
           </td>
           <td class="p-3 align-top font-mono text-[11px] text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50/50">
             ${escapeHtml(textBlock)}
@@ -1364,7 +1766,7 @@ VPN_Configuracion_MinEnergia.pdf`;
 
     // Copy just the filenames/folders of an obligation
     function copyObligationPlainList(obId) {
-      const items = parsedItems.filter(item => item.assignedObligationId === obId);
+      const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === obId);
       if (items.length === 0) {
         showAlert(`La Obligación ${obId} no tiene documentos asignados actualmente.`, "error");
         return;
@@ -1375,13 +1777,34 @@ VPN_Configuracion_MinEnergia.pdf`;
 
     // Copy standard block format for Word with header
     function copyObligationText(obId) {
-      const items = parsedItems.filter(item => item.assignedObligationId === obId);
+      const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === obId);
       let content = "Documentos empleados o desarrollados para esta actividad:\n";
       if (items.length === 0) {
         content += "(No se registraron evidencias para esta actividad en el periodo)";
       } else {
+        const processedFolders = new Set();
         items.forEach(it => {
-          content += `${it.name}\n`;
+          if (it.isFolder) {
+            const fKey = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+            processedFolders.add(fKey);
+            content += `📁 ${it.name}\n`;
+            const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+            children.forEach(c => {
+              content += `   • ${c.name}\n`;
+            });
+          } else if (!it.folderContext) {
+            content += `• ${it.name}\n`;
+          } else {
+            const fKey = it.folderContext.trim().toLowerCase();
+            if (!processedFolders.has(fKey)) {
+              processedFolders.add(fKey);
+              content += `📁 CARPETA: ${it.folderContext}\n`;
+              const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+              children.forEach(c => {
+                content += `   • ${c.name}\n`;
+              });
+            }
+          }
         });
       }
       copyToClipboard(content, `Texto para la Obligación ${obId} copiado al portapapeles con formato Word.`);
@@ -1400,12 +1823,33 @@ VPN_Configuracion_MinEnergia.pdf`;
         fullReport += `OBLIGACIÓN ${ob.id}:\n${ob.descripcion}\n\n`;
         fullReport += `AVANCES Y LOGROS DEL MES:\nDocumentos empleados o desarrollados para esta actividad:\n`;
         
-        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === ob.id);
         if (items.length === 0) {
           fullReport += "(Sin documentos para este mes)\n";
         } else {
+          const processedFolders = new Set();
           items.forEach(it => {
-            fullReport += `${it.name}\n`;
+            if (it.isFolder) {
+              const fKey = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+              processedFolders.add(fKey);
+              fullReport += `📁 ${it.name}\n`;
+              const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+              children.forEach(c => {
+                fullReport += `   • ${c.name}\n`;
+              });
+            } else if (!it.folderContext) {
+              fullReport += `• ${it.name}\n`;
+            } else {
+              const fKey = it.folderContext.trim().toLowerCase();
+              if (!processedFolders.has(fKey)) {
+                processedFolders.add(fKey);
+                fullReport += `📁 CARPETA: ${it.folderContext}\n`;
+                const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+                children.forEach(c => {
+                  fullReport += `   • ${c.name}\n`;
+                });
+              }
+            }
           });
         }
         fullReport += "\n-------------------------------------------------------\n\n";
@@ -1429,12 +1873,35 @@ VPN_Configuracion_MinEnergia.pdf`;
       `;
 
       OBLIGACIONES.forEach(ob => {
-        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === ob.id);
+        const processedFolders = new Set();
         let docs = "Documentos empleados o desarrollados para esta actividad:<br/>";
         if (items.length === 0) {
           docs += "<i>(No se registraron evidencias en el período)</i>";
         } else {
-          docs += items.map(it => escapeHtml(it.name)).join("<br/>");
+          items.forEach(it => {
+            if (it.isFolder) {
+              const fKey = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+              processedFolders.add(fKey);
+              docs += `<b>📁 ${escapeHtml(it.name)}</b><br/>`;
+              const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+              children.forEach(c => {
+                docs += `&nbsp;&nbsp;&nbsp;• ${escapeHtml(c.name)}<br/>`;
+              });
+            } else if (!it.folderContext) {
+              docs += `• ${escapeHtml(it.name)}<br/>`;
+            } else {
+              const fKey = it.folderContext.trim().toLowerCase();
+              if (!processedFolders.has(fKey)) {
+                processedFolders.add(fKey);
+                docs += `<b>📁 CARPETA: ${escapeHtml(it.folderContext)}</b><br/>`;
+                const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+                children.forEach(c => {
+                  docs += `&nbsp;&nbsp;&nbsp;• ${escapeHtml(c.name)}<br/>`;
+                });
+              }
+            }
+          });
         }
 
         htmlTable += `
@@ -1450,7 +1917,7 @@ VPN_Configuracion_MinEnergia.pdf`;
 
       let plainText = "";
       OBLIGACIONES.forEach(ob => {
-        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === ob.id);
         plainText += `No. ${ob.id}\n${ob.descripcion}\n\nDocumentos empleados o desarrollados para esta actividad:\n`;
         items.forEach(it => { plainText += `${it.name}\n`; });
         plainText += "\n\n";
@@ -1500,12 +1967,35 @@ VPN_Configuracion_MinEnergia.pdf`;
       `;
 
       OBLIGACIONES.forEach(ob => {
-        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        const items = parsedItems.filter(item => parseInt(item.assignedObligationId, 10) === ob.id);
+        const processedFolders = new Set();
         let docs = "Documentos empleados o desarrollados para esta actividad:<br/>";
         if (items.length === 0) {
           docs += "(Sin evidencias reportadas en el periodo)";
         } else {
-          docs += items.map(it => escapeHtml(it.name)).join("<br/>");
+          items.forEach(it => {
+            if (it.isFolder) {
+              const fKey = (it.folderContext || it.name.replace(/^carpeta:\s*/i, '')).trim().toLowerCase();
+              processedFolders.add(fKey);
+              docs += `<b>📁 ${escapeHtml(it.name)}</b><br/>`;
+              const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+              children.forEach(c => {
+                docs += `&nbsp;&nbsp;&nbsp;• ${escapeHtml(c.name)}<br/>`;
+              });
+            } else if (!it.folderContext) {
+              docs += `• ${escapeHtml(it.name)}<br/>`;
+            } else {
+              const fKey = it.folderContext.trim().toLowerCase();
+              if (!processedFolders.has(fKey)) {
+                processedFolders.add(fKey);
+                docs += `<b>📁 CARPETA: ${escapeHtml(it.folderContext)}</b><br/>`;
+                const children = items.filter(c => !c.isFolder && (c.folderContext || '').trim().toLowerCase() === fKey);
+                children.forEach(c => {
+                  docs += `&nbsp;&nbsp;&nbsp;• ${escapeHtml(c.name)}<br/>`;
+                });
+              }
+            }
+          });
         }
 
         content += `
@@ -1591,6 +2081,17 @@ VPN_Configuracion_MinEnergia.pdf`;
       return (str || "").replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
 
+    function copyFolderFiles(folderName) {
+      const cleanKey = folderName.replace(/^carpeta:\s*/i, '').trim().toLowerCase();
+      const files = parsedItems.filter(it => !it.isFolder && (it.folderContext || '').trim().toLowerCase() === cleanKey);
+      if (files.length === 0) {
+        copySingleName(folderName);
+        return;
+      }
+      const text = files.map(f => f.name).join("\n");
+      copyToClipboard(text, `Copiados ${files.length} archivos de la carpeta "${folderName}".`);
+    }
+
     function openMoveModal(index) {
       currentEditIndex = index;
       const item = parsedItems[index];
@@ -1602,9 +2103,36 @@ VPN_Configuracion_MinEnergia.pdf`;
         const opt = document.createElement("option");
         opt.value = ob.id;
         opt.textContent = `Obligación ${ob.id} - ${ob.titulo.substring(0, 42)}...`;
-        if (ob.id === item.assignedObligationId) opt.selected = true;
+        if (ob.id === parseInt(item.assignedObligationId, 10)) opt.selected = true;
         select.appendChild(opt);
       });
+
+      const folderContainer = document.getElementById("modalFolderSyncContainer");
+      const folderNote = document.getElementById("modalFolderSyncNote");
+      const folderCheckbox = document.getElementById("modalSyncFolderCheckbox");
+
+      const folderKey = (item.folderContext || (item.isFolder ? item.name.replace(/^carpeta:\s*/i, '') : '')).trim().toLowerCase();
+      if (folderKey) {
+        const relatedCount = parsedItems.filter(it => {
+          const k = (it.folderContext || (it.isFolder ? it.name.replace(/^carpeta:\s*/i, '') : '')).trim().toLowerCase();
+          return k === folderKey;
+        }).length;
+
+        if (folderContainer) folderContainer.classList.remove("hidden");
+        if (folderCheckbox) {
+          folderCheckbox.checked = true;
+        }
+        if (folderNote) {
+          if (item.isFolder) {
+            folderNote.textContent = `Se reasignará la carpeta y todos sus ${Math.max(0, relatedCount - 1)} documentos contenidos a la obligación seleccionada, manteniéndolos agrupados.`;
+          } else {
+            folderNote.textContent = `Este documento pertenece a la carpeta "${item.folderContext}". Mover también la carpeta y los otros ${Math.max(0, relatedCount - 1)} documentos asociados a la misma sección.`;
+          }
+        }
+      } else {
+        if (folderContainer) folderContainer.classList.add("hidden");
+        if (folderCheckbox) folderCheckbox.checked = false;
+      }
 
       document.getElementById("moveModal").classList.remove("hidden");
     }
@@ -1617,16 +2145,46 @@ VPN_Configuracion_MinEnergia.pdf`;
     document.getElementById("modalBtnConfirm").addEventListener("click", () => {
       if (currentEditIndex < 0) return;
       const select = document.getElementById("modalSelectObligation");
-      parsedItems[currentEditIndex].assignedObligationId = parseInt(select.value, 10);
-      parsedItems[currentEditIndex].reason = "Reasignación manual personalizada";
+      const targetOb = parseInt(select.value, 10);
+      const item = parsedItems[currentEditIndex];
+      const folderCheckbox = document.getElementById("modalSyncFolderCheckbox");
+
+      const folderKey = (item.folderContext || (item.isFolder ? item.name.replace(/^carpeta:\s*/i, '') : '')).trim().toLowerCase();
+
+      if (folderCheckbox && folderCheckbox.checked && folderKey) {
+        let countMoved = 0;
+        parsedItems.forEach(it => {
+          const k = (it.folderContext || (it.isFolder ? it.name.replace(/^carpeta:\s*/i, '') : '')).trim().toLowerCase();
+          if (k === folderKey) {
+            it.assignedObligationId = targetOb;
+            it.reason = `Reasignado con la carpeta "${item.folderContext || item.name}"`;
+            countMoved++;
+          }
+        });
+        showAlert(`Se reasignaron ${countMoved} elementos de la carpeta a la Obligación ${targetOb}.`, "success");
+      } else {
+        item.assignedObligationId = targetOb;
+        item.reason = "Reasignación manual individual";
+        showAlert(`Documento "${item.name}" reasignado a la Obligación ${targetOb}.`, "success");
+      }
+
       closeModal();
       renderAllViews();
-      showAlert("Documento reasignado correctamente.", "success");
+      updateStatistics();
     });
 
     // Buttons bindings
-    document.getElementById("btnClassifyAI").addEventListener("click", classifyWithAI);
-    document.getElementById("btnProcessRules").addEventListener("click", classifyWithRules);
+    const btnClassifyAI = document.getElementById("btnClassifyAI");
+    if (btnClassifyAI) btnClassifyAI.addEventListener("click", classifyWithAI);
+
+    const btnClassifyAIInline = document.getElementById("btnClassifyAIInline");
+    if (btnClassifyAIInline) btnClassifyAIInline.addEventListener("click", classifyWithAI);
+
+    const btnProcessRules = document.getElementById("btnProcessRules");
+    if (btnProcessRules) btnProcessRules.addEventListener("click", classifyWithRules);
+
+    const btnProcessRulesInline = document.getElementById("btnProcessRulesInline");
+    if (btnProcessRulesInline) btnProcessRulesInline.addEventListener("click", classifyWithRules);
     document.getElementById("btnCopyEntireTable").addEventListener("click", copyEntireReport);
     document.getElementById("btnCopyTableFormatted").addEventListener("click", copyWordHtmlTable);
     document.getElementById("btnDownloadWordDoc").addEventListener("click", downloadWordDoc);
@@ -1709,10 +2267,25 @@ VPN_Configuracion_MinEnergia.pdf`;
         line = line.trim();
         if (!line) continue;
         line = line.replace(/^[\s•\-\*\u2022\u25E6\u25AA\u25AB\u2013\u2014]+/, '').trim();
-        if (/^\d+[\.\)]\s+/.test(line)) {
+        if (/^\d+[\.\)]\s+/.test(line) && !/^\d-202/i.test(line)) {
           line = line.replace(/^\d+[\.\)]\s+/, '').trim();
         }
         if (!line) continue;
+
+        const hasFileExt = /\.[a-z0-9]{2,5}$/i.test(line);
+        const isRadicado = /^(1|2|3)-202/i.test(line) || /^\d{14,18}/.test(line);
+        const isFolder = /^carpeta:\s*/i.test(line);
+
+        // If it's a file, radicado or folder, keep it unconditionally!
+        if (hasFileExt || isRadicado || isFolder) {
+          const key = line.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            cleanList.push(line);
+          }
+          continue;
+        }
+
         if (ignorePatterns.some(p => p.test(line))) continue;
         if (/^obligaci[oó]n\s+\d/i.test(line)) continue;
 
@@ -1722,6 +2295,11 @@ VPN_Configuracion_MinEnergia.pdf`;
           cleanList.push(line);
         }
       }
+
+      if (cleanList.length === 0 && lines.length > 0) {
+        return lines.filter(l => l.trim().length > 0).join('\n');
+      }
+
       return cleanList.join('\n');
     }
 
@@ -1878,7 +2456,7 @@ VPN_Configuracion_MinEnergia.pdf`;
       folderMap.forEach((fileList, folderName) => {
         extractedText += `CARPETA: ${folderName}\n`;
         fileList.forEach(file => {
-          extractedText += `${file}\n`;
+          extractedText += `  ${file}\n`;
         });
       });
       rootFiles.forEach(file => {
