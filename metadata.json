@@ -1,0 +1,7 @@
+{
+  "name": "Clasificador de Informes y Evidencias GAN - MME",
+  "description": "Clasificador inteligente de informes de actividades y evidencias mensuales con IA Gemini para el GAN - MinEnergía y SECOP II.",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

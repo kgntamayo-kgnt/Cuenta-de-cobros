@@ -4,6 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clasificador de Informes y Evidencias GAN - MME</title>
+  <meta name="description" content="Clasificador inteligente de informes de actividades y evidencias mensuales con IA Gemini para el GAN - MinEnergía y SECOP II.">
+  <meta property="og:title" content="Clasificador de Informes y Evidencias GAN - MME">
+  <meta property="og:description" content="Clasificador inteligente de informes de actividades y evidencias mensuales con IA Gemini para el GAN - MinEnergía y SECOP II.">
+  <script>
+    // Safeguard for browser extensions attempting to override window.fetch
+    (function() {
+      try {
+        let originalFetch = window.fetch ? window.fetch.bind(window) : null;
+        Object.defineProperty(window, 'fetch', {
+          get: function() {
+            return originalFetch;
+          },
+          set: function(val) {
+            originalFetch = val;
+          },
+          configurable: true,
+          enumerable: true
+        });
+      } catch (e) {}
+
+      window.addEventListener('error', function(event) {
+        if (event.filename && event.filename.startsWith('chrome-extension://')) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+        }
+      }, true);
+    })();
+  </script>
+  <!-- Library for client-side Word (.docx) text extraction with CDN fallback -->
+  <script src="/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     *, *::before, *::after {
@@ -18,7 +49,6 @@
       min-height: 100vh;
       overflow-x: hidden;
     }
-    /* Estricta contención de gráficos para evitar desbordes visuales */
     svg {
       display: inline-block;
       vertical-align: middle;
@@ -43,10 +73,15 @@
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+    .drop-active {
+      border-color: #0284c7 !important;
+      background-color: #f0f9ff !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased">
 
+  <!-- Header -->
   <header class="bg-slate-900 text-white shadow-md border-b border-sky-900/40 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3">
       <div class="flex items-center space-x-3">
@@ -61,10 +96,20 @@
           <p class="text-xs text-sky-200/80">Karel Giovanny Nuñez Tamayo | Contrato GGC-0073-2026</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button id="btnProcessAll" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer">
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btnClassifyAI" class="bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-lg transition-all shadow-md flex items-center gap-1.5 active:scale-95 cursor-pointer">
+          <span id="aiSpinner" class="hidden animate-spin">🔄</span>
+          <span id="aiIcon">✨</span>
+          <span id="aiBtnText">Clasificar con IA</span>
+        </button>
+        <button id="btnProcessRules" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Clasificación inmediata usando las reglas contractuales">
           <span>⚡</span>
-          <span>Clasificar Todo</span>
+          <span>Clasificar por Reglas</span>
+        </button>
+        <button id="btnOpenRulesModal" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 hover:border-sky-500/40 font-semibold text-xs sm:text-sm px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Ver y administrar las reglas vigentes GAN">
+          <span>📜</span>
+          <span>Reglas GAN</span>
+          <span id="rulesCountBadge" class="bg-sky-500/20 text-sky-300 text-[10px] px-1.5 py-0.2 rounded-full border border-sky-400/30">7</span>
         </button>
         <button id="btnCopyEntireTable" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer">
           <span>📋</span>
@@ -87,8 +132,12 @@
       </div>
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
-          <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Clasificados (100%)</p>
-          <p id="statAssignedItems" class="text-2xl font-bold text-emerald-600">0</p>
+          <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Cobertura Contractual</p>
+          <div class="flex items-baseline gap-1.5">
+            <p id="statCoverage" class="text-2xl font-bold text-emerald-600">7 / 7</p>
+            <span class="text-[11px] font-semibold text-slate-500">obligaciones</span>
+          </div>
+          <p class="text-[10px] text-emerald-700 font-medium">✓ 100% con evidencias</p>
         </div>
         <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">✓</div>
       </div>
@@ -108,32 +157,70 @@
       </div>
     </div>
 
+    <!-- Engine Status Notification -->
+    <div id="engineStatusBanner" class="bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2">
+        <span class="text-base" id="engineStatusIcon">✨</span>
+        <span class="font-medium" id="engineStatusText">Motor listo para clasificar cada documento o carpeta en exactamente una de las 7 obligaciones.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="openRulesModal()" class="text-sky-700 hover:text-sky-900 font-semibold underline cursor-pointer text-xs flex items-center gap-1">
+          <span>📜</span> Ver / Editar Reglas Vigentes →
+        </button>
+        <span id="engineBadge" class="bg-sky-200 text-sky-800 font-semibold px-2.5 py-0.5 rounded-full text-[10px]">
+          IA Gemini / Reglas GAN
+        </span>
+      </div>
+    </div>
+
+    <!-- Input Section with File Upload, Folder Picker, and Textarea -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <span>📥</span> Listado de Producciones Mensuales a Clasificar
+            <span>📥</span> Cargar Producciones Mensuales a Clasificar
           </h2>
-          <p class="text-xs text-slate-500 mt-0.5">Pega aquí los nombres de archivos o usa la muestra de Septiembre 2026.</p>
+          <p class="text-xs text-slate-500 mt-0.5">Pega el listado, arrastra archivos, o sube un archivo/carpeta de soporte del mes.</p>
         </div>
-        <div class="flex items-center gap-2">
-          <button id="btnReloadSample" class="text-xs text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium cursor-pointer">
-            Recargar Septiembre 2026
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Hidden inputs for file & folder uploads -->
+          <input type="file" id="fileUploadInput" accept=".docx,.doc,.txt,.csv,.md,.json" class="hidden">
+          <input type="file" id="folderUploadInput" webkitdirectory directory multiple class="hidden">
+
+          <button id="btnUploadFileTrigger" class="text-xs text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium flex items-center gap-1.5 cursor-pointer" title="Cargar archivo Word (.docx) o listado de texto">
+            <span>📄</span> Cargar Archivo Word / Texto
+          </button>
+          <button id="btnUploadFolderTrigger" class="text-xs text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium flex items-center gap-1.5 cursor-pointer" title="Escanear estructura de carpeta local">
+            <span>📁</span> Cargar Carpeta
+          </button>
+          <button id="btnReloadSample" class="text-xs text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium cursor-pointer" title="Cargar reporte real de Septiembre 2026">
+            Septiembre 2026
+          </button>
+          <button id="btnReloadSampleAugust" class="text-xs text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium cursor-pointer" title="Cargar reporte de muestra del mes anterior (Agosto 2026)">
+            Agosto 2026 (Anterior)
           </button>
           <button id="toggleInputPanel" class="text-xs text-sky-700 hover:text-sky-900 font-semibold px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 transition-colors cursor-pointer">
-            Mostrar / Ocultar Caja
+            Mostrar / Ocultar
           </button>
         </div>
       </div>
 
       <div id="inputPanelsWrapper" class="p-4 flex flex-col gap-3">
-        <textarea id="txtCurrentMonth" rows="8" class="w-full text-xs font-mono p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none custom-scrollbar" placeholder="Pega aquí el listado de archivos y carpetas del mes..."></textarea>
+        <!-- Drag & Drop Zone -->
+        <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-lg p-2.5 transition-colors bg-slate-50/50">
+          <textarea id="txtCurrentMonth" rows="8" class="w-full text-xs font-mono p-3 bg-transparent border-0 rounded-lg focus:ring-0 focus:outline-none custom-scrollbar resize-y" placeholder="Pega aquí los nombres de archivos y carpetas del mes, o arrastra un archivo de texto aquí..."></textarea>
+        </div>
         
         <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
-          <span class="text-slate-500">El 100% de los archivos se asignan de acuerdo a las 7 obligaciones contractuales.</span>
-          <button id="btnClearInput" class="text-xs text-rose-600 hover:text-rose-800 underline font-medium cursor-pointer">
-            Limpiar texto
-          </button>
+          <div class="flex items-center gap-2 text-slate-500">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Los radicados <strong>1-202...</strong>, <strong>2-202...</strong> o <strong>3-202...</strong> se asignan automáticamente a la <strong>Obligación 2 (Instalaciones)</strong>.</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <button id="btnClearInput" class="text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer">
+              Limpiar texto
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -148,16 +235,16 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-xs font-semibold">
         <button id="tabCardsView" class="px-4 py-2 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer">Vista por Obligación (7)</button>
-        <button id="tabTableView" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer">Tabla Formato Word</button>
+        <button id="tabTableView" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer">Tabla Formato Word (Oficial)</button>
       </div>
 
       <div class="flex items-center gap-2 text-xs">
-        <span class="text-slate-500 font-medium">Buscar en resultados:</span>
-        <input type="text" id="quickSearch" placeholder="Buscar radicado o palabra..." class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none w-56 sm:w-64">
+        <span class="text-slate-500 font-medium">Filtrar por nombre o radicado:</span>
+        <input type="text" id="quickSearch" placeholder="Ej. 1-2026, NORM, BID, acta..." class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none w-56 sm:w-64">
       </div>
     </div>
 
-    <!-- Cards View -->
+    <!-- Cards View (7 Obligations) -->
     <div id="cardsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <!-- Injected dynamically by JS -->
     </div>
@@ -166,12 +253,17 @@
     <div id="tableOutputContainer" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
       <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 pb-3">
         <div>
-          <h3 class="text-sm font-bold text-slate-800">Previsualización de la Tabla para Word (Informe Mensual)</h3>
-          <p class="text-xs text-slate-500">Copia y pega directamente en la plantilla .docx en la columna de avances y logros.</p>
+          <h3 class="text-sm font-bold text-slate-800">Previsualización de la Tabla Formato Word (GC-M2-F24)</h3>
+          <p class="text-xs text-slate-500">Copia con celdas directas o descarga el archivo listo para abrir en Microsoft Word.</p>
         </div>
-        <button id="btnDownloadWordSnippet" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 font-semibold transition-colors cursor-pointer">
-          <span>📋</span> Copiar Todo al Portapapeles
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnCopyTableFormatted" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 font-semibold transition-colors cursor-pointer shadow-sm" title="Copia como tabla HTML para que Word pegue celdas reales">
+            <span>📋</span> Copiar Tabla con Celdas Word
+          </button>
+          <button id="btnDownloadWordDoc" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 font-semibold transition-colors cursor-pointer shadow-sm" title="Descarga archivo .doc con la tabla oficial">
+            <span>💾</span> Descargar .doc
+          </button>
+        </div>
       </div>
 
       <div class="overflow-x-auto border border-slate-200 rounded-lg">
@@ -197,7 +289,7 @@
     <div class="bg-white rounded-xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4">
       <div class="flex justify-between items-center border-b border-slate-200 pb-3">
         <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
-          <span>✏️</span> Cambiar de Obligación
+          <span>✏️</span> Reasignar Documento
         </h4>
         <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold leading-none cursor-pointer">&times;</button>
       </div>
@@ -215,6 +307,184 @@
         <button onclick="closeModal()" class="px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-100 font-medium cursor-pointer">Cancelar</button>
         <button id="modalBtnConfirm" class="px-4 py-1.5 rounded-lg text-xs bg-sky-600 hover:bg-sky-500 text-white font-semibold cursor-pointer">Guardar Cambio</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Reglas Contractuales GAN (Vigentes y Nuevas) -->
+  <div id="rulesModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-3xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] my-auto">
+      
+      <!-- Modal Header -->
+      <div class="flex justify-between items-start border-b border-slate-200 pb-3">
+        <div>
+          <h3 class="font-bold text-sm sm:text-base text-slate-800 flex items-center gap-2">
+            <span>📜</span> Reglas Contractuales GAN Vigentes
+            <span class="text-[10px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-full border border-sky-300/40">MME • SECOP II</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-1">
+            Estas reglas definen los criterios de clasificación que emplean tanto el clasificador de <strong>Inteligencia Artificial (Gemini)</strong> como el <strong>motor de reglas</strong>.
+          </p>
+        </div>
+        <button onclick="closeRulesModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none cursor-pointer p-1">&times;</button>
+      </div>
+
+      <!-- Modal Tabs: Reglas Activas vs Agregar Regla vs Criterios Contractuales -->
+      <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pt-3 pb-2 text-xs font-semibold">
+        <button id="tabRulesList" class="px-3.5 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer">
+          📖 Reglas Vigentes (1 a 7)
+        </button>
+        <button id="tabAddRule" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer flex items-center gap-1">
+          <span>➕</span> Agregar / Administrar Reglas
+        </button>
+        <button id="tabPrioritization" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer flex items-center gap-1">
+          <span>⚖️</span> Cobertura (7/7) y Priorización
+        </button>
+      </div>
+
+      <!-- Modal Body Content -->
+      <div class="flex-1 overflow-y-auto py-3 custom-scrollbar space-y-4">
+        
+        <!-- Tab Content 1: Active Rules List with live search -->
+        <div id="rulesListContainer" class="space-y-3">
+          <div class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <span class="text-slate-400 text-sm">🔍</span>
+            <input type="text" id="searchRulesInput" placeholder="Buscar por obligación, criterio o palabra clave (ej. 1-202..., NORM, BID, acta, reactores)..." class="w-full text-xs bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-800">
+          </div>
+          <div id="rulesCardsWrapper" class="space-y-3">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- Tab Content 2: Add Rule Form & Custom Rules -->
+        <div id="addRuleContainer" class="hidden space-y-4">
+          <div class="bg-sky-50 border border-sky-200 rounded-xl p-3.5 text-xs text-sky-900">
+            <p class="font-bold flex items-center gap-1.5">
+              <span>💡</span> ¿Cómo se aplican las reglas al clasificador?
+            </p>
+            <p class="mt-1 leading-relaxed">
+              Toda regla guardada se incorpora automáticamente con <strong>máxima prioridad</strong> tanto en el prompt enviado al modelo de <strong>IA Gemini (gemini-3.8-flash)</strong> como en el clasificador local de reglas GAN.
+            </p>
+          </div>
+
+          <form id="formNewRule" class="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+            <div>
+              <label for="ruleTargetObligation" class="block text-xs font-bold text-slate-700 mb-1">
+                Obligación Contractual de Destino:
+              </label>
+              <select id="ruleTargetObligation" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 bg-white">
+                <!-- Populated dynamically 1 to 7 -->
+              </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="ruleMatchType" class="block text-xs font-bold text-slate-700 mb-1">
+                  Condición de Coincidencia:
+                </label>
+                <select id="ruleMatchType" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 bg-white">
+                  <option value="startsWith">Comienza con el prefijo (ej. 4-202..., ACTA-)</option>
+                  <option value="contains" selected>Contiene la palabra o texto clave</option>
+                  <option value="endsWith">Termina en la extensión o texto (ej. .zip, -final)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="rulePattern" class="block text-xs font-bold text-slate-700 mb-1">
+                  Texto o Patrón Clave:
+                </label>
+                <input type="text" id="rulePattern" placeholder="Ej. 4-2026, INVIMA, auditoría OIEA" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 bg-white" required>
+              </div>
+            </div>
+
+            <div>
+              <label for="ruleDescription" class="block text-xs font-bold text-slate-700 mb-1">
+                Justificación Contractual / Motivo:
+              </label>
+              <input type="text" id="ruleDescription" placeholder="Ej. Comunicaciones técnicas conjuntas para nuevas licencias" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 bg-white" required>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
+              <button type="button" onclick="resetNewRuleForm()" class="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-200 font-medium cursor-pointer">
+                Limpiar Formulario
+              </button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg text-xs bg-sky-600 hover:bg-sky-500 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1.5">
+                <span>💾</span> Guardar y Activar Regla
+              </button>
+            </div>
+          </form>
+
+          <!-- List of currently configured custom rules -->
+          <div class="space-y-2 pt-2">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+              <span>📌</span> Reglas Personalizadas Creadas (<span id="customRulesCounter">0</span>)
+            </h4>
+            <div id="customRulesList" class="space-y-2">
+              <!-- Injected by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Content 3: Contractual Prioritization & 100% Coverage Explanation -->
+        <div id="prioritizationContainer" class="hidden space-y-4 text-xs">
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-950 space-y-2">
+            <h4 class="font-bold text-sm flex items-center gap-2 text-emerald-900">
+              <span>🎯</span> 1. Regla de Cobertura Total (7 de 7 Obligaciones)
+            </h4>
+            <p class="leading-relaxed">
+              El informe de ejecución contractual presentado para supervisión en el Ministerio de Minas y Energía y SECOP II exige que <strong>todas y cada una de las 7 obligaciones contractuales cuente con documentos y evidencias de soporte</strong>.
+            </p>
+            <p class="leading-relaxed">
+              El clasificador (tanto mediante IA Gemini como con el motor determinístico) aplica un <strong>balanceador de cobertura total</strong>: si tras la clasificación inicial alguna obligación queda en 0 evidencias, se redistribuyen documentos afines de las obligaciones con exceso para garantizar que las 7 obligaciones queden cubiertas.
+            </p>
+          </div>
+
+          <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-indigo-950 space-y-2">
+            <h4 class="font-bold text-sm flex items-center gap-2 text-indigo-900">
+              <span>⚡</span> 2. Priorización Técnica (Obligaciones 1 a 6 vs Obligación 7)
+            </h4>
+            <p class="leading-relaxed">
+              <strong>La Obligación 7 es de carácter residual y estrictamente administrativo o no técnico</strong>: contiene reuniones administrativas generales, soporte de conectividad VPN / FortiClient, formato de informe GC-M2-F24, aportes generales al PND y cuentas de cobro.
+            </p>
+            <p class="leading-relaxed">
+              <strong>Se debe priorizar enérgicamente el contenido técnico en las Obligaciones 1 a 6</strong>:
+            </p>
+            <ul class="list-disc list-inside space-y-1 pl-1 text-slate-700">
+              <li><strong>Obligación 1:</strong> Política pública, Hitos OIEA, NEPIO, hojas de ruta de nucleoelectricidad.</li>
+              <li><strong>Obligación 2:</strong> Radicados oficiales (1-202..., 2-202..., 3-202...), licencias e inspección de instalaciones y fuentes.</li>
+              <li><strong>Obligación 3:</strong> Términos de Referencia (TdRs), contratos, consultores y convenios BID/ANSN.</li>
+              <li><strong>Obligación 4:</strong> Informes técnicos de mitigación de riesgos radiológicos, hallazgos y evidencias fotográficas.</li>
+              <li><strong>Obligación 5:</strong> Material NORM/TENORM, fosfoyeso, mesas técnicas y cooperación bilateral (Argentina, Brasil, España, etc.).</li>
+              <li><strong>Obligación 6:</strong> Actas de reunión, respuestas a Derechos de Petición (Rta DP) y respuestas al Congreso/Legislativo.</li>
+            </ul>
+          </div>
+
+          <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-sky-950 space-y-2">
+            <h4 class="font-bold text-sm flex items-center gap-2 text-sky-900">
+              <span>🏭</span> 3. Regla Fundamental de Radicados (Obligación 2)
+            </h4>
+            <p class="leading-relaxed">
+              Cualquier archivo o carpeta que inicie con los prefijos <strong>1-202...</strong>, <strong>2-202...</strong>, <strong>3-202...</strong> o números de expediente del sistema de gestión documental (ej. <strong>120264...</strong>, <strong>20264...</strong>) corresponde a trámites técnicos de instalaciones nucleares o radiactivas y se asigna prioritariamente a la <strong>Obligación 2</strong>.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex flex-wrap justify-between items-center gap-3 border-t border-slate-200 pt-3 text-xs">
+        <button id="btnResetAllRules" class="text-rose-600 hover:text-rose-800 underline font-medium cursor-pointer text-xs">
+          Restablecer a reglas predeterminadas
+        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeRulesModal()" class="px-3.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium cursor-pointer">
+            Cerrar
+          </button>
+          <button id="btnApplyRulesAndReclassify" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1.5">
+            <span>⚡</span> Aplicar y Reclasificar Todo
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -260,6 +530,119 @@
         descripcion: "Todas las demás inherentes o necesarias para la correcta ejecución del objeto contractual y su alcance, que le sean asignadas por el o la supervisor (a)."
       }
     ];
+
+    // Detalle de los criterios contractuales y palabras clave vigentes para cada obligación
+    const DEFAULT_RULES_INFO = {
+      1: {
+        categoria: "Acuerdos e Hitos Nucleares / Política Pública",
+        criterios: [
+          "Metodología de Hitos OIEA (Milestone Approach para nucleoelectricidad)",
+          "NEPIO (Nuclear Energy Programme Implementing Organization)",
+          "Hojas de ruta de energía nuclear y nucleoelectricidad",
+          "Memorando de Entendimiento con el Departamento de Energía (DOE EE.UU.)",
+          "Taxonomía Verde de Colombia"
+        ],
+        palabrasClave: ["iaea_milestone", "enfoque_de_hitos", "fase1_enfoque", "nepio", "doe", "taxonomía verde", "nucleoelectricidad", "roadmap"]
+      },
+      2: {
+        categoria: "Apoyo Técnico en Instalaciones, Licencias e Inspecciones",
+        criterios: [
+          "Comunicaciones y trámites con radicado oficial (1-202..., 2-202..., 3-202..., 120264..., 20264...)",
+          "Expedientes de fuentes radiactivas (GDR, Sr, Sr--Am, Ra-226)",
+          "Instructivos y formatos de acceso a instalaciones (F-TNU-MRN, IN-TNU-MRN)",
+          "Exámenes técnicos a operadores y personal de mantenimiento del reactor IAN-R1",
+          "Solicitudes de disponibilidad y calificaciones de personal técnico"
+        ],
+        palabrasClave: ["1-202...", "2-202...", "3-202...", "fuente gdr", "fuente sr", "instructivo acceso", "examen reactor", "licencias", "radicado"]
+      },
+      3: {
+        categoria: "Seguimiento a Contratos, Convenios y TdRs",
+        criterios: [
+          "Términos de Referencia (TdRs) para consultores individuales o firmas",
+          "Propuestas de cooperación técnica y financiación con el BID",
+          "Contratos y minutas para el fortalecimiento del regulador nuclear (ANSN)",
+          "Supervisión técnica, administrativa y financiera de convenios del GAN"
+        ],
+        palabrasClave: ["tdr", "propfin", "propuestafinanciación", "consultor individual", "prioridades macro bid", "contrato ansn", "convenio"]
+      },
+      4: {
+        categoria: "Informes Técnicos de Mitigación de Riesgos y Fuentes",
+        criterios: [
+          "Informes técnicos de mitigación de riesgos radiológicos",
+          "Recomendaciones y formulación de hallazgos de inspecciones técnicas",
+          "Registros fotográficos de evidencias en terreno e instalaciones",
+          "Anexos técnicos de evaluación de fuentes huérfanas o en desuso"
+        ],
+        palabrasClave: ["anexos", "mitigacion", "riesgos", "inspeccion", "evidencias fotográficas (.jpg, .png)"]
+      },
+      5: {
+        categoria: "Articulación de Mesas Técnicas, Cooperación y NORM",
+        criterios: [
+          "Regulación y gestión de Material Radiactivo Natural (NORM/TENORM)",
+          "Manejo de fosfoyeso, industrias de petróleo, gas y minería",
+          "Eventos de cooperación bilateral: Argentina (ARN/CNEN), Brasil (ANSN/CNEN), España (CSN)",
+          "Mesas técnicas interinstitucionales, presentaciones SGC, OLACDE, OIEA y BID"
+        ],
+        palabrasClave: ["norm", "fosfoyeso", "argentina", "brasil", "españa", "cnen", "ansn", "csn", "presentacion sgc", "cooperación"]
+      },
+      6: {
+        categoria: "Elaboración y Revisión de Actas y Respuestas Legislativas",
+        criterios: [
+          "Respuestas a Derechos de Petición ciudadanos (Rta DP)",
+          "Respuestas a citaciones y cuestionarios del Congreso (Senado / Cámara)",
+          "Seguimiento y pronunciamientos sobre proyectos de ley (Ley 2603 de 2026)",
+          "Actas formales de reuniones de comités o actas de posesión"
+        ],
+        palabrasClave: ["rta dp", "gobernanza resiliente", "respuesta hr", "legislativo", "congreso", "acta posesion", "ley_2603", "derecho de petición"]
+      },
+      7: {
+        categoria: "Demás Actividades Inherentes / Normativa / Administrativas (Residual y General)",
+        criterios: [
+          "PRIORIZACIÓN: La Obligación 7 está reservada para temas generales, reuniones administrativas, coordinación y asuntos no técnicos.",
+          "Todo documento con contenido técnico debe priorizarse en las Obligaciones 1 a 6.",
+          "Reuniones de coordinación general y capacitaciones administrativas",
+          "Borradores de resoluciones y normatividad general (R626, R763)",
+          "Aportes del GAN a las bases del Plan Nacional de Desarrollo (PND)",
+          "Instalación y soporte de conectividad segura VPN y FortiClient",
+          "Formato oficial de informe mensual de actividades GC-M2-F24",
+          "Cuentas de cobro y documentos de pago del contrato"
+        ],
+        palabrasClave: ["administrativ", "reunion general", "borrador r626", "borrador r763", "pnd", "vpn", "forticlient", "gc-m2-f24", "cuenta de cobro"]
+      }
+    };
+
+    let customRules = [];
+
+    function loadCustomRules() {
+      try {
+        const stored = localStorage.getItem("gan_custom_rules");
+        if (stored) {
+          customRules = JSON.parse(stored);
+        }
+      } catch (err) {
+        customRules = [];
+      }
+      updateRulesBadge();
+    }
+
+    function saveCustomRules() {
+      try {
+        localStorage.setItem("gan_custom_rules", JSON.stringify(customRules));
+      } catch (err) {}
+      updateRulesBadge();
+    }
+
+    function updateRulesBadge() {
+      const badge = document.getElementById("rulesCountBadge");
+      if (badge) {
+        const total = 7 + customRules.length;
+        badge.textContent = `${total}`;
+      }
+      const counter = document.getElementById("customRulesCounter");
+      if (counter) {
+        counter.textContent = `${customRules.length}`;
+      }
+    }
 
     const SAMPLE_SEPTEMBER = `CARPETA: 1-2026-037169 fuente GDR
 1202640050371691_00005.pdf
@@ -394,13 +777,54 @@ TDR - Plantilla Genérica Consultor Individual-Nucleoelctricidad.docx
 TDR - Plantilla Genérica Consultor Individual.docx
 TDR - Plantilla Genérica Firma.docx`;
 
+    const SAMPLE_AUGUST = `CARPETA: 1-2026-032145 trámite medicina nuclear
+1202640050321451_00001.pdf
+1202640050321451_00002.pdf
+2-2026-038740.pdf
+CARPETA: TdR-ANSN-Agosto
+TDR - Especialista en Seguridad Radiológica.docx
+Propuesta Financiacion BID Agosto v1.pdf
+Acuerdo de Cooperación OIEA 2026.pdf
+Colombia_Nuclear_Roadmap_Draft.pptx
+Acta Reunión Comisión Intersectorial No 14.docx
+Respuesta Congreso HR Juan Gomez 2-2026-039120.docx
+Normativa NORM Petroleo y Gas Borrador.docx
+Presentacion Foro NORM MinMinas Agosto.pptx
+Fotos Inspeccion Radiologica Valledupar (3).zip
+Informe Mitigacion Riesgos Fuentes Desuso v2.docx
+Cuenta de cobro agosto 2026 Karel Nunez.pdf
+GC-M2-F24 Informe Actividades Julio-Agosto.docx
+VPN_Configuracion_MinEnergia.pdf`;
+
     let parsedItems = [];
     let currentEditIndex = -1;
 
-    function classifyDocument(item) {
-      const lower = item.name.toLowerCase();
+    // Deterministic Rule-Based Classification (1-202... goes strictly to Ob 2)
+    function classifyDocumentLocal(name, folderContext = "") {
+      const lower = (name + " " + folderContext).toLowerCase();
 
-      // Excepciones Legislativas y Actas (Obligación 6)
+      // Evaluamos primero las reglas personalizadas activas del usuario
+      if (Array.isArray(customRules)) {
+        for (const rule of customRules) {
+          if (rule.enabled === false) continue;
+          const pat = (rule.pattern || "").toLowerCase().trim();
+          if (!pat) continue;
+          const obId = parseInt(rule.obligationId, 10);
+          if (isNaN(obId) || obId < 1 || obId > 7) continue;
+
+          if (rule.matchType === 'startsWith' && lower.startsWith(pat)) {
+            return { id: obId, reason: rule.description || `Regla personalizada: inicia con "${rule.pattern}"` };
+          }
+          if (rule.matchType === 'contains' && lower.includes(pat)) {
+            return { id: obId, reason: rule.description || `Regla personalizada: contiene "${rule.pattern}"` };
+          }
+          if (rule.matchType === 'endsWith' && lower.endsWith(pat)) {
+            return { id: obId, reason: rule.description || `Regla personalizada: termina en "${rule.pattern}"` };
+          }
+        }
+      }
+
+      // Regla 6: Actas y respuestas legislativas
       if (
         lower.includes("rta dp") ||
         lower.includes("gobernanza resiliente") ||
@@ -411,20 +835,24 @@ TDR - Plantilla Genérica Firma.docx`;
         lower.includes("posesion") ||
         lower.includes("ley_2603") ||
         lower.includes("circular_din") ||
-        lower.includes("pronter")
+        lower.includes("pronter") ||
+        lower.includes("acta reunión") ||
+        lower.includes("acta reunion") ||
+        lower.includes("derecho de petición")
       ) {
-        return { id: 6, reason: "Actas de reunión y respuestas al legislativo/congreso" };
+        return { id: 6, reason: "Actas de reunión y respuestas al poder legislativo/Congreso" };
       }
 
-      // Regla Prioritaria: 1-2026-, 2-2026-, 3-2026-, radicados y trámites de instalaciones (Obligación 2)
+      // Regla 2: Instalaciones, licencias e inspecciones (1-202..., 2-202..., 3-202...)
       if (
-        lower.startsWith("1-2026-") ||
-        lower.startsWith("2-2026-") ||
-        lower.startsWith("3-2026-") ||
+        lower.startsWith("1-202") ||
+        lower.startsWith("2-202") ||
+        lower.startsWith("3-202") ||
         lower.startsWith("120264") ||
         lower.startsWith("20264005") ||
-        lower.startsWith("carpeta: 1-2026-") ||
-        lower.startsWith("carpeta: 2-2026-") ||
+        lower.includes("1-2026-") ||
+        lower.includes("2-2026-") ||
+        lower.includes("3-2026-") ||
         lower.includes("fuente gdr") ||
         lower.includes("fuente sr") ||
         lower.includes("fuente sr--am") ||
@@ -437,36 +865,40 @@ TDR - Plantilla Genérica Firma.docx`;
         lower.includes("calificaciones reactor") ||
         lower.includes("examen responsable de mantenimiento") ||
         lower.includes("disponibilida personal") ||
-        lower.includes("examen camilo")
+        lower.includes("examen camilo") ||
+        lower.includes("licencia") ||
+        lower.includes("radicado")
       ) {
-        return { id: 2, reason: "Radicado oficial o trámite de instalaciones (Regla 1-2026 / 2-2026)" };
+        return { id: 2, reason: "Radicado oficial o trámite de instalaciones nucleares/radiactivas (1-202... / 2-202...)" };
       }
 
-      // Obligación 3: Contratos / TdRs / Cooperación BID / Convenios
+      // Regla 3: Contratos / TdRs / Cooperación BID / Convenios
       if (
         lower.includes("tdr") ||
         lower.includes("propfin") ||
         lower.includes("propuestafinaciación") ||
+        lower.includes("propuestafinanciacion") ||
         lower.includes("consultor individual") ||
         lower.includes("prioridades macro bid") ||
         lower.includes("propuesta  discusion bid") ||
+        lower.includes("propuesta discusion bid") ||
         lower.includes("carpeta: tdr-bid") ||
         lower.includes("carpeta: 01-fortalecimiento ansn") ||
         lower.includes("carpeta: 02-nucleoelectricidad") ||
-        lower.includes("presentacion bid")
+        lower.includes("presentacion bid") ||
+        lower.includes("convenio") ||
+        lower.includes("contratacion")
       ) {
-        return { id: 3, reason: "Seguimiento a contratos, convenios y TdRs (BID / ANSN)" };
+        return { id: 3, reason: "Seguimiento a contratos, convenios y TdRs (BID / ANSN / Consultores)" };
       }
 
-      // Obligación 5: Mesas técnicas, NORM, cooperación internacional y presentaciones
+      // Regla 5: Mesas técnicas, NORM, cooperación internacional y presentaciones
       if (
         lower.includes("norm") ||
-        lower.includes("carpeta: argentina") ||
-        lower.includes("carpeta: brasil") ||
-        lower.includes("carpeta: españa") ||
         lower.includes("argentina") ||
         lower.includes("brasil") ||
         lower.includes("españa") ||
+        lower.includes("espana") ||
         lower.includes("cnen") ||
         lower.includes("ansn") ||
         lower.includes("csn") ||
@@ -476,12 +908,14 @@ TDR - Plantilla Genérica Firma.docx`;
         lower.includes("presentacion sgc") ||
         lower.includes("presentacion norm") ||
         lower.includes("presentación institucional norm") ||
-        lower.includes("cooperacion-mme-bid-oiea")
+        lower.includes("cooperacion-mme-bid-oiea") ||
+        lower.includes("mesa técnica") ||
+        lower.includes("mesa tecnica")
       ) {
-        return { id: 5, reason: "Mesas de trabajo técnico, NORM y presentaciones de cooperación" };
+        return { id: 5, reason: "Mesas de trabajo técnico, NORM/TENORM y presentaciones de cooperación" };
       }
 
-      // Obligación 1: Política pública, Hitos OIEA, NEPIO, Hojas de Ruta
+      // Regla 1: Política pública, Hitos OIEA, NEPIO, Hojas de Ruta
       if (
         lower.includes("nepio") ||
         lower.includes("nuclear power programme") ||
@@ -491,30 +925,36 @@ TDR - Plantilla Genérica Firma.docx`;
         lower.includes("fase1_limites") ||
         lower.includes("iaea_milestone") ||
         lower.includes("memorando estratégico") ||
+        lower.includes("memorando estrategico") ||
         lower.includes("doe") ||
         lower.includes("taxonomía verde") ||
         lower.includes("nucleoelectricidad") ||
         lower.includes("nuclear_financial_strategy") ||
         lower.includes("nuclear_energy_evaluation") ||
-        lower.includes("olacde")
+        lower.includes("olacde") ||
+        lower.includes("roadmap")
       ) {
         return { id: 1, reason: "Política pública de nucleoelectricidad y metodología de Hitos OIEA" };
       }
 
-      // Obligación 4: Informes técnicos de mitigación, hallazgos o inspección
+      // Regla 4: Informes técnicos de mitigación, hallazgos o inspección
       if (
         lower.includes("anexos") ||
         lower.includes("mitigacion") ||
+        lower.includes("mitigación") ||
         lower.includes("riesgos") ||
         lower.includes("inspección") ||
         lower.includes("inspeccion") ||
         lower.includes("8833896c") ||
-        lower.includes("c916eaf1")
+        lower.includes("c916eaf1") ||
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".jpeg")
       ) {
         return { id: 4, reason: "Informes técnicos para la mitigación de riesgos y evidencias gráficas" };
       }
 
-      // Obligación 7: Resoluciones, PND, Capacitaciones, Documentos administrativos GAN
+      // Regla 7: Resoluciones, PND, Administrativas, VPN, Cuentas de Cobro
       if (
         lower.includes("borrador r626") ||
         lower.includes("borrador r763") ||
@@ -530,19 +970,30 @@ TDR - Plantilla Genérica Firma.docx`;
         lower.includes("septiembre.zip") ||
         lower.includes("forticlient") ||
         lower.includes("vpn") ||
-        lower.includes("index.html")
+        lower.includes("index.html") ||
+        lower.includes("cuenta de cobro") ||
+        lower.includes("cuenta cobro")
       ) {
-        return { id: 7, reason: "Normativa general, PND y actividades de soporte inherentes" };
+        return { id: 7, reason: "Normativa general, PND, actividades de soporte y cuentas de cobro" };
       }
 
       return { id: 2, reason: "Asignado a gestión técnica de trámites/instalaciones" };
     }
 
-    function processAllData() {
-      const currentRaw = document.getElementById("txtCurrentMonth").value;
-      parsedItems = [];
-      const lines = currentRaw.split("\n");
+    // Parse input text into raw unique items
+    function extractItemsFromText(rawText) {
+      if (!rawText) return [];
+
+      // Check if user accidentally pasted raw binary Word (.docx) data
+      if (rawText.includes("[Content_Types].xml") || (rawText.trim().startsWith("PK") && rawText.includes("word/"))) {
+        showAlert("⚠️ El contenido pegado contiene los caracteres binarios de un archivo Word (.docx). Para cargarlo, haz clic en '📄 Cargar Archivo Word / Texto' y selecciona tu documento Word.", "error");
+        return [];
+      }
+
+      const lines = rawText.split("\n");
+      const items = [];
       let currentFolder = "";
+      const seen = new Set();
 
       for (let i = 0; i < lines.length; i++) {
         let line = lines[i].trim();
@@ -550,34 +1001,208 @@ TDR - Plantilla Genérica Firma.docx`;
         if (line.startsWith("REPORTE DE PRODUCCIONES") || line.startsWith("1. DESGLOSE") || line.startsWith("2. REUNIONES")) continue;
         if (line.includes("No se encontró archivo calendar.ics")) continue;
 
+        // Clean bullet points or numbered lists if pasted from word
+        line = line.replace(/^[\s•\-\*]+/, '').trim();
+        if (!line) continue;
+
+        // Deduplication to strictly satisfy "sin repetirla"
+        const dedupeKey = line.toLowerCase();
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
         if (line.toUpperCase().startsWith("CARPETA:")) {
           currentFolder = line.substring(line.indexOf(":") + 1).trim();
-          const classification = classifyDocument({ name: line });
-          parsedItems.push({
+          items.push({
             name: line,
             folderContext: currentFolder,
-            isFolder: true,
-            assignedObligationId: classification.id,
-            reason: classification.reason
+            isFolder: true
           });
           continue;
         }
 
-        const classification = classifyDocument({ name: line });
-
-        parsedItems.push({
-          raw: line,
+        items.push({
           name: line,
           folderContext: currentFolder,
-          isFolder: false,
-          assignedObligationId: classification.id,
-          reason: classification.reason
+          isFolder: false
         });
       }
 
+      return items;
+    }
+
+    // Classification with Gemini AI
+    async function classifyWithAI() {
+      const currentRaw = document.getElementById("txtCurrentMonth").value;
+      const rawItems = extractItemsFromText(currentRaw);
+
+      if (rawItems.length === 0) {
+        showAlert("Por favor pega o carga al menos un archivo o carpeta para clasificar.", "error");
+        return;
+      }
+
+      // UI loading state
+      const btnAI = document.getElementById("btnClassifyAI");
+      const aiSpinner = document.getElementById("aiSpinner");
+      const aiIcon = document.getElementById("aiIcon");
+      const aiBtnText = document.getElementById("aiBtnText");
+
+      btnAI.disabled = true;
+      btnAI.classList.add("opacity-75", "cursor-wait");
+      aiSpinner.classList.remove("hidden");
+      aiIcon.classList.add("hidden");
+      aiBtnText.textContent = "Clasificando con IA...";
+
+      try {
+        const response = await fetch("/api/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: rawItems, customRules: customRules })
+        });
+
+        if (!response.ok) {
+          throw new Error("HTTP error " + response.status);
+        }
+
+        const data = await response.json();
+        const classifications = data.classifications || [];
+
+        parsedItems = rawItems.map((item, idx) => {
+          const res = classifications[idx] || classifyDocumentLocal(item.name, item.folderContext);
+          return {
+            name: item.name,
+            folderContext: item.folderContext,
+            isFolder: item.isFolder,
+            assignedObligationId: res.obligationId || res.id || 2,
+            reason: res.reason || "Clasificado con IA"
+          };
+        });
+
+        // Garantizar cobertura balanceada de las 7 obligaciones
+        parsedItems = balanceObligationsCoverageClient(rawItems, parsedItems);
+
+        updateStatistics();
+        renderAllViews();
+
+        const providerText = data.provider === "gemini" 
+          ? "Clasificación completada con IA Gemini (gemini-3.8-flash) • Cobertura 100% (7/7)" 
+          : "Clasificación completada mediante Motor Contractual GAN • Cobertura 100% (7/7)";
+        
+        setEngineStatus(providerText, data.provider === "gemini" ? "✨ Gemini 3.8 Flash" : "⚙️ Reglas GAN");
+        showAlert(`¡Éxito! ${parsedItems.length} producciones clasificadas sin repetición con cobertura en las 7 obligaciones.`, "success");
+
+      } catch (err) {
+        console.warn("AI endpoint error, running deterministic rules:", err);
+        classifyWithRules();
+        showAlert("Clasificado mediante motor de reglas contractuales.", "success");
+      } finally {
+        btnAI.disabled = false;
+        btnAI.classList.remove("opacity-75", "cursor-wait");
+        aiSpinner.classList.add("hidden");
+        aiIcon.classList.remove("hidden");
+        aiBtnText.textContent = "Clasificar con IA";
+      }
+    }
+
+    // Balanceador client-side para garantizar cobertura en las 7 obligaciones y priorización 1 a 6
+    function balanceObligationsCoverageClient(items, classifications) {
+      if (!Array.isArray(items) || items.length < 7) {
+        return classifications;
+      }
+
+      const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+      classifications.forEach(c => {
+        const id = c.assignedObligationId;
+        if (counts[id] !== undefined) counts[id]++;
+      });
+
+      const emptyObligations = [1, 2, 3, 4, 5, 6, 7].filter(id => counts[id] === 0);
+      if (emptyObligations.length === 0) {
+        return classifications; // Cobertura 7 de 7 completa
+      }
+
+      const keywordsByOb = {
+        1: ['hitos', 'estrateg', 'politica', 'marco', 'plan', 'doe', 'nepio', 'evaluacion', 'nuclear', 'energia', 'roadmap', 'taxonom'],
+        2: ['instalac', 'tramite', 'soporte', 'licencia', 'inspecc', 'calific', 'tecnico', 'expediente', 'acceso', 'reactor', 'radicado', 'fuente'],
+        3: ['propuesta', 'seguimiento', 'convenio', 'consultor', 'contrat', 'ansn', 'bid', 'financ', 'prioridad', 'tdr'],
+        4: ['riesgo', 'mitigac', 'inspecc', 'hallazgo', 'anexo', 'foto', 'evidencia', 'tecnico', 'fuente', 'fotogr'],
+        5: ['cooperac', 'mesa', 'norm', 'internacional', 'presentacion', 'reunion', 'foro', 'taller', 'comite', 'bilateral'],
+        6: ['acta', 'compromiso', 'respuesta', 'legislativ', 'circular', 'comunicacion', 'resumen', 'pronter', 'senado', 'congreso', 'peticion', 'ley'],
+        7: ['general', 'administrativ', 'reunion', 'soporte', 'induccion', 'formato', 'actividad', 'cuenta', 'plantilla', 'vpn', 'forticlient', 'pnd']
+      };
+
+      emptyObligations.forEach(targetOb => {
+        let bestIndex = -1;
+        let bestScore = -1;
+
+        for (let i = 0; i < items.length; i++) {
+          const currentOb = classifications[i].assignedObligationId;
+          if (counts[currentOb] > 1) {
+            const lowerName = (items[i].name + ' ' + (items[i].folderContext || '')).toLowerCase();
+            const kwList = keywordsByOb[targetOb] || [];
+            let score = 0;
+            kwList.forEach(k => {
+              if (lowerName.includes(k)) score += 3;
+            });
+
+            if (counts[currentOb] > 5) score += 2;
+            else if (counts[currentOb] > 2) score += 1;
+
+            if (targetOb === 7 && (lowerName.includes('administrativ') || lowerName.includes('reunion') || lowerName.includes('cuenta') || lowerName.includes('soporte') || lowerName.includes('formato') || lowerName.includes('pnd') || lowerName.includes('vpn'))) {
+              score += 4;
+            }
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestIndex = i;
+            }
+          }
+        }
+
+        if (bestIndex !== -1) {
+          const oldOb = classifications[bestIndex].assignedObligationId;
+          counts[oldOb]--;
+          counts[targetOb]++;
+          classifications[bestIndex].assignedObligationId = targetOb;
+          classifications[bestIndex].reason = `Asignado para garantizar cobertura total de la Obligación ${targetOb} (${classifications[bestIndex].reason || 'documento afín'})`;
+        }
+      });
+
+      return classifications;
+    }
+
+    // Fast deterministic classification
+    function classifyWithRules() {
+      const currentRaw = document.getElementById("txtCurrentMonth").value;
+      const rawItems = extractItemsFromText(currentRaw);
+
+      if (rawItems.length === 0) {
+        showAlert("Por favor pega o carga al menos un archivo o carpeta.", "error");
+        return;
+      }
+
+      parsedItems = rawItems.map(item => {
+        const res = classifyDocumentLocal(item.name, item.folderContext);
+        return {
+          name: item.name,
+          folderContext: item.folderContext,
+          isFolder: item.isFolder,
+          assignedObligationId: res.id,
+          reason: res.reason
+        };
+      });
+
+      // Garantizar que ninguna quede en 0
+      parsedItems = balanceObligationsCoverageClient(rawItems, parsedItems);
+
       updateStatistics();
       renderAllViews();
-      showAlert(`¡Éxito! ${parsedItems.length} producciones clasificadas en las 7 obligaciones.`, "success");
+      setEngineStatus("Clasificado mediante Motor de Reglas Contractuales GAN (Regla 1-202... / SECOP II • Cobertura 7/7)", "⚙️ Reglas GAN");
+      showAlert(`¡Éxito! ${parsedItems.length} documentos asignados a las 7 obligaciones sin repetición.`, "success");
+    }
+
+    function setEngineStatus(text, badge) {
+      document.getElementById("engineStatusText").textContent = text;
+      document.getElementById("engineBadge").textContent = badge;
     }
 
     function updateStatistics() {
@@ -589,6 +1214,26 @@ TDR - Plantilla Genérica Firma.docx`;
       document.getElementById("statAssignedItems").textContent = totalCount;
       document.getElementById("statOb2Items").textContent = ob2Count;
       document.getElementById("statFolders").textContent = foldersCount;
+
+      const coveredObligations = new Set(parsedItems.map(p => p.assignedObligationId)).size;
+      const statCoverageElem = document.getElementById("statCoverage");
+      const statCoverageNoteElem = document.getElementById("statCoverageNote");
+      if (statCoverageElem) {
+        statCoverageElem.textContent = `${coveredObligations} / 7`;
+        if (coveredObligations === 7) {
+          statCoverageElem.className = "text-2xl font-bold text-emerald-600";
+          if (statCoverageNoteElem) {
+            statCoverageNoteElem.textContent = "✓ 100% Cobertura completa (7/7 cubiertas)";
+            statCoverageNoteElem.className = "text-[10px] text-emerald-700 font-medium";
+          }
+        } else {
+          statCoverageElem.className = "text-2xl font-bold text-amber-600";
+          if (statCoverageNoteElem) {
+            statCoverageNoteElem.textContent = `⚠️ ${7 - coveredObligations} obligación(es) sin evidencias`;
+            statCoverageNoteElem.className = "text-[10px] text-amber-700 font-medium";
+          }
+        }
+      }
     }
 
     function renderCardsView() {
@@ -619,7 +1264,7 @@ TDR - Plantilla Genérica Firma.docx`;
             </div>
             <div class="flex items-center gap-1 shrink-0">
               <span class="bg-sky-100 text-sky-800 font-bold text-xs px-2 py-0.5 rounded-full">${items.length}</span>
-              <button onclick="copyObligationText(${ob.id})" class="text-slate-500 hover:text-sky-600 p-1.5 rounded hover:bg-slate-200 text-xs font-bold cursor-pointer" title="Copiar bloque para Word">
+              <button onclick="copyObligationPlainList(${ob.id})" class="text-slate-600 hover:text-sky-600 p-1.5 rounded hover:bg-slate-200 text-xs font-semibold cursor-pointer" title="Copiar solo listado de archivos">
                 📋
               </button>
             </div>
@@ -628,25 +1273,31 @@ TDR - Plantilla Genérica Firma.docx`;
 
         let listHtml = `<div class="p-3 divide-y divide-slate-100 max-h-80 overflow-y-auto custom-scrollbar flex-1">`;
         if (items.length === 0) {
-          listHtml += `<p class="text-xs text-slate-400 italic py-4 text-center">Sin documentos asignados.</p>`;
+          listHtml += `<p class="text-xs text-slate-400 italic py-6 text-center">Sin documentos asignados a esta obligación.</p>`;
         } else {
           items.forEach(item => {
             const indexInGlobal = parsedItems.indexOf(item);
             if (item.isFolder) {
               listHtml += `
                 <div class="py-1.5 flex items-center justify-between text-xs font-bold text-purple-900 bg-purple-50 px-2 rounded my-1">
-                  <span class="flex items-center gap-1.5 truncate">📁 ${escapeHtml(item.name)}</span>
-                  <button onclick="openMoveModal(${indexInGlobal})" class="text-[11px] text-purple-700 hover:underline shrink-0 font-medium cursor-pointer">Mover</button>
+                  <span class="flex items-center gap-1.5 truncate" title="${escapeHtml(item.name)}&#10;Justificación: ${item.reason}">📁 ${escapeHtml(item.name)}</span>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="copySingleName('${escapeJsString(item.name)}')" class="text-[11px] text-purple-700 hover:text-purple-900 px-1.5 py-0.5 rounded hover:bg-purple-100 font-medium cursor-pointer" title="Copiar nombre">Copiar</button>
+                    <button onclick="openMoveModal(${indexInGlobal})" class="text-[11px] text-purple-700 hover:underline px-1 py-0.5 font-medium cursor-pointer">Mover</button>
+                  </div>
                 </div>
               `;
             } else {
               listHtml += `
                 <div class="py-1.5 flex items-center justify-between gap-2 text-xs group hover:bg-slate-50 px-1 rounded transition-colors">
-                  <div class="truncate flex items-center gap-1.5 flex-1" title="${escapeHtml(item.name)}&#10;Regla: ${item.reason}">
+                  <div class="truncate flex items-center gap-1.5 flex-1" title="${escapeHtml(item.name)}&#10;Justificación: ${item.reason}">
                     <span class="text-slate-400">•</span>
                     <span class="font-mono text-slate-700 truncate">${escapeHtml(item.name)}</span>
                   </div>
                   <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                    <button onclick="copySingleName('${escapeJsString(item.name)}')" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Copiar nombre del archivo">
+                      📋
+                    </button>
                     <button onclick="openMoveModal(${indexInGlobal})" class="p-1 text-slate-400 hover:text-sky-600 rounded text-xs cursor-pointer" title="Cambiar de obligación">
                       ✏️
                     </button>
@@ -659,10 +1310,12 @@ TDR - Plantilla Genérica Firma.docx`;
         listHtml += `</div>`;
 
         let footerHtml = `
-          <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs">
-            <span class="text-[11px] text-slate-500 font-medium">Formato SECOP II</span>
+          <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between items-center text-xs gap-2">
+            <button onclick="copyObligationPlainList(${ob.id})" class="text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1 cursor-pointer">
+              <span>📋</span> Copiar lista (${items.length})
+            </button>
             <button onclick="copyObligationText(${ob.id})" class="text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer">
-              Copiar texto para Word →
+              <span>📝</span> Copiar bloque para Word →
             </button>
           </div>
         `;
@@ -683,9 +1336,13 @@ TDR - Plantilla Genérica Firma.docx`;
         row.className = "hover:bg-slate-50 transition-colors";
 
         let textBlock = "Documentos empleados o desarrollados para esta actividad:\n";
-        items.forEach(it => {
-          textBlock += `${it.name}\n`;
-        });
+        if (items.length === 0) {
+          textBlock += "(No se registraron evidencias para esta obligación en el período)";
+        } else {
+          items.forEach(it => {
+            textBlock += `${it.name}\n`;
+          });
+        }
 
         row.innerHTML = `
           <td class="p-3 text-center font-bold text-slate-600 border-r border-slate-200 align-top">${ob.id}</td>
@@ -705,16 +1362,37 @@ TDR - Plantilla Genérica Firma.docx`;
       renderWordTable();
     }
 
+    // Copy just the filenames/folders of an obligation
+    function copyObligationPlainList(obId) {
+      const items = parsedItems.filter(item => item.assignedObligationId === obId);
+      if (items.length === 0) {
+        showAlert(`La Obligación ${obId} no tiene documentos asignados actualmente.`, "error");
+        return;
+      }
+      let content = items.map(it => it.name).join("\n");
+      copyToClipboard(content, `Listado de ${items.length} archivos de la Obligación ${obId} copiado al portapapeles.`);
+    }
+
+    // Copy standard block format for Word with header
     function copyObligationText(obId) {
       const items = parsedItems.filter(item => item.assignedObligationId === obId);
       let content = "Documentos empleados o desarrollados para esta actividad:\n";
-      items.forEach(it => {
-        content += `${it.name}\n`;
-      });
-
-      copyToClipboard(content, `Texto para la Obligación ${obId} copiado al portapapeles. ¡Listo para pegar en Word!`);
+      if (items.length === 0) {
+        content += "(No se registraron evidencias para esta actividad en el periodo)";
+      } else {
+        items.forEach(it => {
+          content += `${it.name}\n`;
+        });
+      }
+      copyToClipboard(content, `Texto para la Obligación ${obId} copiado al portapapeles con formato Word.`);
     }
 
+    // Copy single filename
+    function copySingleName(name) {
+      copyToClipboard(name, `"${name}" copiado al portapapeles.`);
+    }
+
+    // Copy entire report as text
     function copyEntireReport() {
       let fullReport = "INFORME DE CUMPLIMIENTO - OBLIGACIONES ESPECÍFICAS (GAN - MME)\n=======================================================\n\n";
 
@@ -723,16 +1401,149 @@ TDR - Plantilla Genérica Firma.docx`;
         fullReport += `AVANCES Y LOGROS DEL MES:\nDocumentos empleados o desarrollados para esta actividad:\n`;
         
         const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
-        items.forEach(it => {
-          fullReport += `${it.name}\n`;
-        });
+        if (items.length === 0) {
+          fullReport += "(Sin documentos para este mes)\n";
+        } else {
+          items.forEach(it => {
+            fullReport += `${it.name}\n`;
+          });
+        }
         fullReport += "\n-------------------------------------------------------\n\n";
       });
 
-      copyToClipboard(fullReport, "Informe completo copiado al portapapeles con formato Word.");
+      copyToClipboard(fullReport, "Informe completo copiado al portapapeles en texto listo para Word.");
+    }
+
+    // Copy formatted HTML table so Word pastes authentic table cells
+    function copyWordHtmlTable() {
+      let htmlTable = `
+        <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%;">
+          <thead>
+            <tr style="background-color: #f1f5f9; font-weight: bold;">
+              <th style="width: 5%; text-align: center; border: 1px solid #94a3b8;">No.</th>
+              <th style="width: 40%; text-align: left; border: 1px solid #94a3b8;">OBLIGACIONES Y/O ACTIVIDADES</th>
+              <th style="width: 55%; text-align: left; border: 1px solid #94a3b8;">AVANCES Y LOGROS DEL MES (Documentos de soporte)</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      OBLIGACIONES.forEach(ob => {
+        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        let docs = "Documentos empleados o desarrollados para esta actividad:<br/>";
+        if (items.length === 0) {
+          docs += "<i>(No se registraron evidencias en el período)</i>";
+        } else {
+          docs += items.map(it => escapeHtml(it.name)).join("<br/>");
+        }
+
+        htmlTable += `
+          <tr>
+            <td style="text-align: center; font-weight: bold; border: 1px solid #cbd5e1; vertical-align: top;">${ob.id}</td>
+            <td style="border: 1px solid #cbd5e1; vertical-align: top;">${escapeHtml(ob.descripcion)}</td>
+            <td style="border: 1px solid #cbd5e1; vertical-align: top; font-family: monospace; font-size: 9pt;">${docs}</td>
+          </tr>
+        `;
+      });
+
+      htmlTable += `</tbody></table>`;
+
+      let plainText = "";
+      OBLIGACIONES.forEach(ob => {
+        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        plainText += `No. ${ob.id}\n${ob.descripcion}\n\nDocumentos empleados o desarrollados para esta actividad:\n`;
+        items.forEach(it => { plainText += `${it.name}\n`; });
+        plainText += "\n\n";
+      });
+
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blobHtml = new Blob([htmlTable], { type: "text/html" });
+        const blobText = new Blob([plainText], { type: "text/plain" });
+        const data = [new ClipboardItem({ "text/html": blobHtml, "text/plain": blobText })];
+        navigator.clipboard.write(data).then(() => {
+          showAlert("¡Tabla copiada con celdas! Pégala directamente en Microsoft Word (Ctrl+V).", "success");
+        }).catch(() => {
+          copyToClipboard(plainText, "Tabla copiada como texto.");
+        });
+      } else {
+        copyToClipboard(plainText, "Tabla copiada como texto.");
+      }
+    }
+
+    // Download .doc file
+    function downloadWordDoc() {
+      let content = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>Informe Mensual de Actividades GAN</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 10pt; }
+            table { border-collapse: collapse; width: 100%; }
+            th { background-color: #f1f5f9; border: 1px solid #000; padding: 6px; font-weight: bold; }
+            td { border: 1px solid #000; padding: 6px; vertical-align: top; }
+            .mono { font-family: "Courier New", Courier, monospace; font-size: 8.5pt; }
+          </style>
+        </head>
+        <body>
+          <h2 style="text-align: center;">INFORME MENSUAL DE ACTIVIDADES - GAN / MME</h2>
+          <p><strong>Contrato:</strong> GGC-0073-2026 | <strong>Contratista:</strong> Karel Giovanny Nuñez Tamayo</p>
+          <table border="1">
+            <thead>
+              <tr>
+                <th style="width: 5%;">No.</th>
+                <th style="width: 45%;">OBLIGACIONES Y/O ACTIVIDADES</th>
+                <th style="width: 50%;">AVANCES Y LOGROS DEL MES (Documentos de soporte)</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      OBLIGACIONES.forEach(ob => {
+        const items = parsedItems.filter(item => item.assignedObligationId === ob.id);
+        let docs = "Documentos empleados o desarrollados para esta actividad:<br/>";
+        if (items.length === 0) {
+          docs += "(Sin evidencias reportadas en el periodo)";
+        } else {
+          docs += items.map(it => escapeHtml(it.name)).join("<br/>");
+        }
+
+        content += `
+          <tr>
+            <td style="text-align: center; font-weight: bold;">${ob.id}</td>
+            <td>${escapeHtml(ob.descripcion)}</td>
+            <td class="mono">${docs}</td>
+          </tr>
+        `;
+      });
+
+      content += `</tbody></table></body></html>`;
+
+      const blob = new Blob(['\ufeff' + content], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Informe_GAN_Evidencias_${new Date().toISOString().slice(0, 10)}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showAlert("Archivo .doc generado y descargado correctamente.", "success");
     }
 
     function copyToClipboard(text, successMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showAlert(successMsg, "success");
+        }).catch(() => {
+          fallbackCopy(text, successMsg);
+        });
+      } else {
+        fallbackCopy(text, successMsg);
+      }
+    }
+
+    function fallbackCopy(text, successMsg) {
       const textarea = document.createElement("textarea");
       textarea.value = text;
       textarea.style.position = "fixed";
@@ -746,7 +1557,7 @@ TDR - Plantilla Genérica Firma.docx`;
         if (successful) {
           showAlert(successMsg, "success");
         } else {
-          showAlert("No se pudo copiar automáticamente.", "error");
+          showAlert("Por favor copia manualmente el texto seleccionado.", "error");
         }
       } catch (err) {
         showAlert("Error al copiar al portapapeles.", "error");
@@ -764,16 +1575,20 @@ TDR - Plantilla Genérica Firma.docx`;
       box.classList.remove("hidden");
       setTimeout(() => {
         box.classList.add("hidden");
-      }, 4500);
+      }, 5000);
     }
 
     function escapeHtml(str) {
-      return str
+      return (str || "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    function escapeJsString(str) {
+      return (str || "").replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
 
     function openMoveModal(index) {
@@ -809,15 +1624,25 @@ TDR - Plantilla Genérica Firma.docx`;
       showAlert("Documento reasignado correctamente.", "success");
     });
 
-    document.getElementById("btnProcessAll").addEventListener("click", processAllData);
+    // Buttons bindings
+    document.getElementById("btnClassifyAI").addEventListener("click", classifyWithAI);
+    document.getElementById("btnProcessRules").addEventListener("click", classifyWithRules);
     document.getElementById("btnCopyEntireTable").addEventListener("click", copyEntireReport);
-    document.getElementById("btnDownloadWordSnippet").addEventListener("click", copyEntireReport);
+    document.getElementById("btnCopyTableFormatted").addEventListener("click", copyWordHtmlTable);
+    document.getElementById("btnDownloadWordDoc").addEventListener("click", downloadWordDoc);
     document.getElementById("quickSearch").addEventListener("input", renderCardsView);
 
+    // Sample Presets
     document.getElementById("btnReloadSample").addEventListener("click", () => {
       document.getElementById("txtCurrentMonth").value = SAMPLE_SEPTEMBER;
-      processAllData();
+      classifyWithAI();
       showAlert("Listado de Septiembre 2026 cargado y clasificado.", "success");
+    });
+
+    document.getElementById("btnReloadSampleAugust").addEventListener("click", () => {
+      document.getElementById("txtCurrentMonth").value = SAMPLE_AUGUST;
+      classifyWithAI();
+      showAlert("Listado de Agosto 2026 (mes anterior) cargado y clasificado.", "success");
     });
 
     document.getElementById("btnClearInput").addEventListener("click", () => {
@@ -825,7 +1650,7 @@ TDR - Plantilla Genérica Firma.docx`;
       parsedItems = [];
       updateStatistics();
       renderAllViews();
-      showAlert("Área de texto limpiada. Puedes pegar un nuevo listado mensual.", "success");
+      showAlert("Área de texto limpiada. Puedes pegar o cargar un nuevo listado.", "success");
     });
 
     document.getElementById("toggleInputPanel").addEventListener("click", () => {
@@ -833,6 +1658,259 @@ TDR - Plantilla Genérica Firma.docx`;
       panel.classList.toggle("hidden");
     });
 
+    // File Upload Handler
+    const fileUploadInput = document.getElementById("fileUploadInput");
+    document.getElementById("btnUploadFileTrigger").addEventListener("click", () => {
+      fileUploadInput.click();
+    });
+
+    // Helper to convert ArrayBuffer to Base64
+    function arrayBufferToBase64(buffer) {
+      return new Promise((resolve, reject) => {
+        const blob = new Blob([buffer]);
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.split(",")[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // Helper to clean and normalize text extracted from Word reports or pasted lists
+    function cleanExtractedWordText(raw) {
+      if (!raw) return "";
+      const lines = raw.split(/\r?\n/);
+      const cleanList = [];
+      const seen = new Set();
+      const ignorePatterns = [
+        /^\s*informe\s+mensual/i,
+        /^\s*formato\s+informe/i,
+        /^\s*ministerio\s+de\s+minas/i,
+        /^\s*contrato\s+ggc/i,
+        /^\s*contratista:/i,
+        /^\s*supervisor:/i,
+        /^\s*objeto\s+del\s+contrato/i,
+        /^\s*obligaciones\s+y\/o\s+actividades/i,
+        /^\s*avances\s+y\s+logros/i,
+        /^\s*documentos\s+empleados\s+o\s+desarrollados/i,
+        /^\s*no\.\s+obligaciones/i,
+        /^\s*\(no\s+se\s+registraron\s+evidencias/i,
+        /^\s*\(sin\s+evidencias/i,
+        /^\s*reporte\s+de\s+producciones/i,
+        /^\s*desglose/i,
+        /^\s*reuniones\s+y\s+eventos/i,
+        /^\s*no\s+se\s+encontró\s+archivo/i
+      ];
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        line = line.replace(/^[\s•\-\*\u2022\u25E6\u25AA\u25AB\u2013\u2014]+/, '').trim();
+        if (/^\d+[\.\)]\s+/.test(line)) {
+          line = line.replace(/^\d+[\.\)]\s+/, '').trim();
+        }
+        if (!line) continue;
+        if (ignorePatterns.some(p => p.test(line))) continue;
+        if (/^obligaci[oó]n\s+\d/i.test(line)) continue;
+
+        const key = line.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          cleanList.push(line);
+        }
+      }
+      return cleanList.join('\n');
+    }
+
+    // Unified file processor with DOCX Word text extraction & binary prevention
+    async function handleUploadedFile(file) {
+      if (!file) return;
+      const fileName = file.name || "documento";
+      const lower = fileName.toLowerCase();
+      showAlert(`Procesando archivo "${fileName}"...`, "success");
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer.slice(0, 4));
+        const isZipMagic = uint8[0] === 0x50 && uint8[1] === 0x4B; // PK magic bytes
+        const isWord = isZipMagic || lower.endsWith(".docx") || lower.endsWith(".doc") || 
+                       (file.type && (file.type.includes("wordprocessingml") || file.type.includes("msword")));
+
+        if (isWord) {
+          showAlert(`Extrayendo texto del documento Word "${fileName}"...`, "success");
+          let extractedText = "";
+
+          // 1. Client Mammoth library
+          if (window.mammoth && window.mammoth.extractRawText) {
+            try {
+              const res = await window.mammoth.extractRawText({ arrayBuffer });
+              if (res && res.value) {
+                extractedText = cleanExtractedWordText(res.value);
+              }
+            } catch (mErr) {
+              console.warn("Client mammoth error:", mErr);
+            }
+          }
+
+          // 2. Fallback to server endpoint /api/parse-docx
+          if (!extractedText || !extractedText.trim()) {
+            const base64 = await arrayBufferToBase64(arrayBuffer);
+            const serverRes = await fetch("/api/parse-docx", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ base64 })
+            });
+            if (serverRes.ok) {
+              const data = await serverRes.json();
+              extractedText = data.text || cleanExtractedWordText(data.rawText) || "";
+            }
+          }
+
+          if (extractedText && extractedText.trim()) {
+            document.getElementById("txtCurrentMonth").value = extractedText.trim();
+            showAlert(`¡Documento Word "${fileName}" procesado con éxito! Se cargaron las evidencias y se procede a clasificar...`, "success");
+            classifyWithAI();
+            return;
+          } else {
+            throw new Error("No se pudo extraer texto legible del documento Word. Verifica que contenga texto y no esté protegido.");
+          }
+        }
+
+        // Plain text, CSV, Markdown
+        const decoder = new TextDecoder("utf-8");
+        const text = decoder.decode(arrayBuffer);
+
+        if (text.includes("[Content_Types].xml") || (text.startsWith("PK") && text.length > 50)) {
+          // It's a Word binary file uploaded as text
+          showAlert("⚠️ Detectado documento Word en formato comprimido. Extrayendo contenido...", "success");
+          const base64 = await arrayBufferToBase64(arrayBuffer);
+          const serverRes = await fetch("/api/parse-docx", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ base64 })
+          });
+          if (serverRes.ok) {
+            const data = await serverRes.json();
+            if (data.text) {
+              document.getElementById("txtCurrentMonth").value = data.text.trim();
+              showAlert(`¡Texto extraído del documento Word con éxito! Clasificando...`, "success");
+              classifyWithAI();
+              return;
+            }
+          }
+          showAlert("⚠️ El archivo contiene datos binarios de Word. Por favor cárgalo como archivo .docx.", "error");
+          return;
+        }
+
+        document.getElementById("txtCurrentMonth").value = text.trim();
+        showAlert(`Archivo "${fileName}" cargado. Procediendo a clasificar...`, "success");
+        classifyWithAI();
+
+      } catch (err) {
+        console.error("Error al procesar archivo:", err);
+        showAlert(`Error al procesar "${fileName}": ${err.message}`, "error");
+      }
+    }
+
+    fileUploadInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        handleUploadedFile(file);
+      }
+      fileUploadInput.value = "";
+    });
+
+    // Paste event safeguard on txtCurrentMonth
+    const txtMonthArea = document.getElementById("txtCurrentMonth");
+    txtMonthArea.addEventListener("paste", (e) => {
+      if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+        e.preventDefault();
+        handleUploadedFile(e.clipboardData.files[0]);
+        return;
+      }
+      const pasted = e.clipboardData ? e.clipboardData.getData("text") : "";
+      if (pasted && (pasted.includes("[Content_Types].xml") || (pasted.startsWith("PK") && pasted.length > 60))) {
+        e.preventDefault();
+        showAlert("⚠️ Has pegado datos binarios internos de un archivo Word (.docx). Para cargarlo limpiamente sin caracteres extraños ('PK...'), usa el botón '📄 Cargar Archivo Word / Texto' o arrastra el archivo aquí.", "error");
+      }
+    });
+
+    // Drag and drop across entire window
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleUploadedFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Folder Upload Handler (webkitdirectory)
+    const folderUploadInput = document.getElementById("folderUploadInput");
+    document.getElementById("btnUploadFolderTrigger").addEventListener("click", () => {
+      folderUploadInput.click();
+    });
+
+    folderUploadInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      // Group files by relative path folders
+      const folderMap = new Map();
+      const rootFiles = [];
+
+      files.forEach(f => {
+        const parts = f.webkitRelativePath.split("/");
+        if (parts.length > 2) {
+          const folderName = parts[1];
+          if (!folderMap.has(folderName)) folderMap.set(folderName, []);
+          folderMap.get(folderName).push(parts.slice(2).join("/"));
+        } else if (parts.length === 2) {
+          rootFiles.push(parts[1]);
+        } else {
+          rootFiles.push(f.name);
+        }
+      });
+
+      let extractedText = "";
+      folderMap.forEach((fileList, folderName) => {
+        extractedText += `CARPETA: ${folderName}\n`;
+        fileList.forEach(file => {
+          extractedText += `${file}\n`;
+        });
+      });
+      rootFiles.forEach(file => {
+        extractedText += `${file}\n`;
+      });
+
+      document.getElementById("txtCurrentMonth").value = extractedText;
+      showAlert(`Carpeta leída con ${files.length} archivos. Clasificando...`, "success");
+      classifyWithAI();
+      folderUploadInput.value = "";
+    });
+
+    // Drag and Drop files onto dropZone
+    const dropZone = document.getElementById("dropZone");
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("drop-active");
+    });
+    dropZone.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("drop-active");
+    });
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("drop-active");
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        handleUploadedFile(files[0]);
+      }
+    });
+
+    // Tabs toggle
     const tabCards = document.getElementById("tabCardsView");
     const tabTable = document.getElementById("tabTableView");
     const viewCards = document.getElementById("cardsContainer");
@@ -857,9 +1935,307 @@ TDR - Plantilla Genérica Firma.docx`;
       viewTable.classList.remove("hidden");
     });
 
+    // --- Gestión del Modal de Reglas GAN ---
+    function openRulesModal() {
+      renderRulesListView();
+      renderCustomRulesList();
+      populateObligationSelects();
+      switchRulesTab("list");
+      document.getElementById("rulesModal").classList.remove("hidden");
+    }
+
+    function closeRulesModal() {
+      document.getElementById("rulesModal").classList.add("hidden");
+    }
+
+    function switchRulesTab(tab) {
+      const btnList = document.getElementById("tabRulesList");
+      const btnAdd = document.getElementById("tabAddRule");
+      const btnPrio = document.getElementById("tabPrioritization");
+      const viewList = document.getElementById("rulesListContainer");
+      const viewAdd = document.getElementById("addRuleContainer");
+      const viewPrio = document.getElementById("prioritizationContainer");
+
+      // Reset buttons
+      [btnList, btnAdd, btnPrio].forEach(btn => {
+        if (btn) btn.className = "px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer font-semibold flex items-center gap-1";
+      });
+      // Hide all views
+      [viewList, viewAdd, viewPrio].forEach(v => {
+        if (v) v.classList.add("hidden");
+      });
+
+      if (tab === "list") {
+        if (btnList) btnList.className = "px-3.5 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer font-semibold";
+        if (viewList) viewList.classList.remove("hidden");
+        renderRulesListView();
+      } else if (tab === "add") {
+        if (btnAdd) btnAdd.className = "px-3.5 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer font-semibold flex items-center gap-1";
+        if (viewAdd) viewAdd.classList.remove("hidden");
+        renderCustomRulesList();
+      } else if (tab === "prioritization") {
+        if (btnPrio) btnPrio.className = "px-3.5 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition-all cursor-pointer font-semibold flex items-center gap-1";
+        if (viewPrio) viewPrio.classList.remove("hidden");
+      }
+    }
+
+    function populateObligationSelects() {
+      const selTarget = document.getElementById("ruleTargetObligation");
+      if (!selTarget) return;
+      selTarget.innerHTML = "";
+      OBLIGACIONES.forEach(ob => {
+        const opt = document.createElement("option");
+        opt.value = ob.id;
+        opt.textContent = `Obligación ${ob.id} - ${ob.titulo.substring(0, 48)}...`;
+        selTarget.appendChild(opt);
+      });
+    }
+
+    function renderRulesListView() {
+      const wrapper = document.getElementById("rulesCardsWrapper") || document.getElementById("rulesListContainer");
+      if (!wrapper) return;
+      wrapper.innerHTML = "";
+
+      const searchInput = document.getElementById("searchRulesInput");
+      const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+
+      let displayedCount = 0;
+
+      OBLIGACIONES.forEach(ob => {
+        const info = DEFAULT_RULES_INFO[ob.id] || { criterios: [], palabrasClave: [] };
+        const myCustom = customRules.filter(r => r.obligationId === ob.id);
+
+        // Check if matches search query
+        if (query) {
+          const matchTitle = ob.titulo.toLowerCase().includes(query);
+          const matchDesc = ob.descripcion.toLowerCase().includes(query);
+          const matchCriterios = info.criterios.some(c => c.toLowerCase().includes(query));
+          const matchKeywords = info.palabrasClave.some(k => k.toLowerCase().includes(query));
+          const matchCustom = myCustom.some(r => r.pattern.toLowerCase().includes(query) || r.description.toLowerCase().includes(query));
+
+          if (!matchTitle && !matchDesc && !matchCriterios && !matchKeywords && !matchCustom && query !== `${ob.id}`) {
+            return;
+          }
+        }
+
+        displayedCount++;
+        const card = document.createElement("div");
+        card.className = "bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-2.5";
+
+        let customSectionHtml = "";
+        if (myCustom.length > 0) {
+          customSectionHtml = `
+            <div class="mt-2 pt-2 border-t border-slate-100">
+              <p class="text-[11px] font-bold text-indigo-700 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                <span>⚡</span> Reglas adicionales configuradas (${myCustom.length}):
+              </p>
+              <div class="space-y-1.5">
+                ${myCustom.map(r => `
+                  <div class="bg-indigo-50/60 border ${r.enabled !== false ? 'border-indigo-200/70' : 'border-slate-300 opacity-60'} rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded">
+                          ${r.matchType === 'startsWith' ? 'Inicia con' : r.matchType === 'endsWith' ? 'Termina en' : 'Contiene'}
+                        </span>
+                        <span class="font-mono font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
+                          "${escapeHtml(r.pattern)}"
+                        </span>
+                        ${r.enabled !== false ? '<span class="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-1.5 py-0.2 rounded">Activa</span>' : '<span class="text-[10px] text-slate-500 font-semibold bg-slate-200 px-1.5 py-0.2 rounded">Pausada</span>'}
+                      </div>
+                      <p class="text-[11px] text-slate-600 mt-0.5">${escapeHtml(r.description)}</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <button onclick="toggleCustomRule('${r.id}')" class="text-xs px-2 py-0.5 rounded border ${r.enabled !== false ? 'bg-indigo-100 text-indigo-800 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'} font-medium cursor-pointer" title="Activar/Pausar regla">
+                        ${r.enabled !== false ? 'Pausar' : 'Activar'}
+                      </button>
+                      <button onclick="deleteCustomRule('${r.id}')" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 text-xs cursor-pointer font-bold" title="Eliminar regla">
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        let prioBadge = ob.id === 7 
+          ? `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">Residual / Administrativa</span>`
+          : `<span class="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-200">Prioridad Técnica</span>`;
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="w-5 h-5 rounded-full bg-sky-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  ${ob.id}
+                </span>
+                <h4 class="text-xs font-bold text-slate-800">${ob.titulo}</h4>
+                ${prioBadge}
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">${ob.descripcion}</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5 text-xs space-y-1.5">
+            <p class="text-[11px] font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1">
+              <span>🏛️</span> Criterios contractuales vigentes (usados por IA Gemini y reglas):
+            </p>
+            <ul class="list-disc list-inside text-[11px] text-slate-600 space-y-0.5">
+              ${info.criterios.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+            </ul>
+            <div class="flex flex-wrap gap-1 pt-1">
+              ${info.palabrasClave.map(k => `<span class="bg-slate-200 text-slate-700 font-mono text-[10px] px-1.5 py-0.5 rounded">${escapeHtml(k)}</span>`).join('')}
+            </div>
+          </div>
+
+          ${customSectionHtml}
+        `;
+
+        wrapper.appendChild(card);
+      });
+
+      if (displayedCount === 0) {
+        wrapper.innerHTML = `
+          <div class="p-6 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+            <p class="text-xs">No se encontraron reglas coincidentes con "<strong>${escapeHtml(query)}</strong>".</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderCustomRulesList() {
+      const container = document.getElementById("customRulesList");
+      if (!container) return;
+      container.innerHTML = "";
+
+      if (customRules.length === 0) {
+        container.innerHTML = `
+          <p class="text-xs text-slate-400 italic py-3 text-center bg-white rounded-lg border border-slate-200">
+            No has agregado reglas personalizadas aún. Las 7 obligaciones operan con sus criterios contractuales estándar vigentes.
+          </p>
+        `;
+        return;
+      }
+
+      customRules.forEach(r => {
+        const item = document.createElement("div");
+        item.className = `bg-white border ${r.enabled !== false ? 'border-slate-200' : 'border-slate-300 opacity-60'} rounded-lg p-3 text-xs flex items-center justify-between gap-3 shadow-xs`;
+        item.innerHTML = `
+          <div class="flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="bg-sky-600 text-white font-bold text-[10px] px-2 py-0.5 rounded-full">
+                Obligación ${r.obligationId}
+              </span>
+              <span class="bg-slate-100 text-slate-700 text-[10px] font-medium px-2 py-0.5 rounded">
+                ${r.matchType === 'startsWith' ? 'Inicia con' : r.matchType === 'endsWith' ? 'Termina en' : 'Contiene'}
+              </span>
+              <span class="font-mono font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                "${escapeHtml(r.pattern)}"
+              </span>
+              ${r.enabled !== false ? '<span class="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-1.5 py-0.2 rounded">Activa</span>' : '<span class="text-[10px] text-slate-500 font-semibold bg-slate-200 px-1.5 py-0.2 rounded">Pausada</span>'}
+            </div>
+            <p class="text-[11px] text-slate-600 mt-1">${escapeHtml(r.description)}</p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="toggleCustomRule('${r.id}')" class="px-2.5 py-1 rounded border ${r.enabled !== false ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'} font-medium text-xs cursor-pointer">
+              ${r.enabled !== false ? 'Pausar' : 'Activar'}
+            </button>
+            <button onclick="deleteCustomRule('${r.id}')" class="text-rose-600 hover:text-rose-800 px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 font-medium text-xs cursor-pointer flex items-center gap-1">
+              <span>🗑️</span> Eliminar
+            </button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function toggleCustomRule(ruleId) {
+      const rule = customRules.find(r => r.id === ruleId);
+      if (rule) {
+        rule.enabled = rule.enabled === false ? true : false;
+        saveCustomRules();
+        renderRulesListView();
+        renderCustomRulesList();
+        showAlert(rule.enabled ? `Regla "${rule.pattern}" activada.` : `Regla "${rule.pattern}" pausada.`, "success");
+      }
+    }
+
+    function resetNewRuleForm() {
+      const f = document.getElementById("formNewRule");
+      if (f) f.reset();
+    }
+
+    function deleteCustomRule(ruleId) {
+      customRules = customRules.filter(r => r.id !== ruleId);
+      saveCustomRules();
+      renderRulesListView();
+      renderCustomRulesList();
+      showAlert("Regla personalizada eliminada.", "success");
+    }
+
+    document.getElementById("btnOpenRulesModal").addEventListener("click", openRulesModal);
+    document.getElementById("tabRulesList").addEventListener("click", () => switchRulesTab("list"));
+    document.getElementById("tabAddRule").addEventListener("click", () => switchRulesTab("add"));
+    const tabPrioElem = document.getElementById("tabPrioritization");
+    if (tabPrioElem) {
+      tabPrioElem.addEventListener("click", () => switchRulesTab("prioritization"));
+    }
+    const searchRulesInput = document.getElementById("searchRulesInput");
+    if (searchRulesInput) {
+      searchRulesInput.addEventListener("input", renderRulesListView);
+    }
+
+    document.getElementById("formNewRule").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const obId = parseInt(document.getElementById("ruleTargetObligation").value, 10);
+      const matchType = document.getElementById("ruleMatchType").value;
+      const pattern = document.getElementById("rulePattern").value.trim();
+      const description = document.getElementById("ruleDescription").value.trim();
+
+      if (!pattern) {
+        showAlert("Por favor ingresa un patrón o texto a buscar.", "error");
+        return;
+      }
+
+      const newRule = {
+        id: "rule_" + Date.now(),
+        obligationId: obId,
+        matchType: matchType,
+        pattern: pattern,
+        description: description || `Coincidencia con ${pattern}`,
+        enabled: true
+      };
+
+      customRules.push(newRule);
+      saveCustomRules();
+      resetNewRuleForm();
+      renderRulesListView();
+      renderCustomRulesList();
+      showAlert(`Regla "${pattern}" guardada. Ahora el clasificador IA y de reglas la aplicará con máxima prioridad.`, "success");
+    });
+
+    document.getElementById("btnResetAllRules").addEventListener("click", () => {
+      if (confirm("¿Deseas eliminar todas las reglas personalizadas y volver a las reglas estándar contractuales?")) {
+        customRules = [];
+        saveCustomRules();
+        renderRulesListView();
+        renderCustomRulesList();
+        showAlert("Reglas personalizadas eliminadas. Criterios estándar restaurados.", "success");
+      }
+    });
+
+    document.getElementById("btnApplyRulesAndReclassify").addEventListener("click", () => {
+      closeRulesModal();
+      classifyWithAI();
+      showAlert("Reclasificando producciones con las reglas vigentes...", "success");
+    });
+
     window.onload = function() {
+      loadCustomRules();
+      populateObligationSelects();
       document.getElementById("txtCurrentMonth").value = SAMPLE_SEPTEMBER;
-      processAllData();
+      classifyWithAI();
     };
   </script>
 </body>

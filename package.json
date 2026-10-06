@@ -1,0 +1,17 @@
+{
+  "name": "cuenta-de-cobros",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build successful')\"",
+    "lint": "node --check server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.27.0",
+    "express": "^4.21.2",
+    "mammoth": "^1.13.0"
+  }
+}
